@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>NCDs Dashboard</title>
+
+    <!-- ECharts CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+
+    <style>
+      :root {
+        --pad: 14px;
+        --gap: 14px;
+        /* Dark Theme Colors */
+        --bg-primary: #0b1020;
+        --bg-secondary: #0f1530;
+        --bg-tertiary: #0f1733;
+        --bg-card: #0f1530;
+        --bg-gradient: linear-gradient(0deg, #0b1020, #0f1530);
+        --bg-card-gradient: radial-gradient(
+            1200px 400px at -10% -40%,
+            #182045 0%,
+            transparent 40%
+          ),
+          #0f1530;
+        --text-primary: #e7e9ee;
+        --text-secondary: rgba(231, 233, 238, 0.7);
+        --border-primary: #20263f;
+        --border-secondary: #1c2342;
+        --border-tertiary: #243055;
+        --border-focus: #4c74ff;
+        --badge-border: #2a3a78;
+        --ok-bg: #072a1b;
+        --ok-border: #144d37;
+        --ok-text: #79f2c0;
+        --warn-bg: #2a1707;
+        --warn-border: #6b3b0a;
+        --warn-text: #ffd37a;
+        --danger-bg: #2a0707;
+        --danger-border: #6b0a0a;
+        --danger-text: #ff8f8f;
+        --shadow: rgba(0, 0, 0, 0.25);
+      }
+
+      body.light-theme {
+        /* Light Theme Colors */
+        --bg-primary: #f5f7fa;
+        --bg-secondary: #ffffff;
+        --bg-tertiary: #ffffff;
+        --bg-card: #ffffff;
+        --bg-gradient: linear-gradient(0deg, #f5f7fa, #ffffff);
+        --bg-card-gradient: radial-gradient(
+            1200px 400px at -10% -40%,
+            #e8ecf5 0%,
+            transparent 40%
+          ),
+          #ffffff;
+        --text-primary: #1a1d2e;
+        --text-secondary: rgba(26, 29, 46, 0.7);
+        --border-primary: #e1e4e8;
+        --border-secondary: #d1d5db;
+        --border-tertiary: #c2c7d0;
+        --border-focus: #4c74ff;
+        --badge-border: #c2c7d0;
+        --ok-bg: #d1fae5;
+        --ok-border: #6ee7b7;
+        --ok-text: #047857;
+        --warn-bg: #fef3c7;
+        --warn-border: #fbbf24;
+        --warn-text: #92400e;
+        --danger-bg: #fee2e2;
+        --danger-border: #fca5a5;
+        --danger-text: #b91c1c;
+        --shadow: rgba(0, 0, 0, 0.1);
+      }
+
+      body {
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+          "Noto Sans Thai", "Prompt", Arial, sans-serif;
+        margin: 0;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        transition: background-color 0.3s ease, color 0.3s ease;
+      }
+      header {
+        padding: 18px var(--pad);
+        border-bottom: 1px solid var(--border-primary);
+        background: var(--bg-gradient);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+      .header-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      h1 {
+        margin: 0 0 2px;
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+      }
+      .sub {
+        color: var(--text-secondary);
+        font-size: 12px;
+      }
+      .theme-toggle {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-secondary);
+        border-radius: 10px;
+        padding: 8px 16px;
+        color: var(--text-primary);
+        cursor: pointer;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.3s ease;
+      }
+      .theme-toggle:hover {
+        border-color: var(--border-focus);
+        transform: translateY(-1px);
+      }
+      .theme-icon {
+        font-size: 18px;
+      }
+
+      .toolbar {
+        display: grid;
+        gap: var(--gap);
+        grid-template-columns: repeat(4, minmax(160px, 1fr));
+        margin-top: 12px;
+      }
+      .ctrl {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .ctrl label {
+        font-size: 12px;
+        opacity: 0.8;
+      }
+      select,
+      input[type="text"] {
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-tertiary);
+        border-radius: 10px;
+        padding: 10px 12px;
+        outline: none;
+        transition: all 0.3s ease;
+      }
+      select:focus,
+      input[type="text"]:focus {
+        border-color: var(--border-focus);
+      }
+
+      .grid {
+        display: grid;
+        gap: var(--gap);
+        grid-template-columns: 2fr 2fr 2fr;
+        padding: var(--pad);
+      }
+      .card {
+        background: var(--bg-card-gradient);
+        border: 1px solid var(--border-secondary);
+        border-radius: 16px;
+        padding: var(--pad);
+        box-shadow: 0 10px 30px var(--shadow);
+        transition: all 0.3s ease;
+      }
+      .card h3 {
+        margin: 0 0 10px;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+      }
+
+      .kpis {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: var(--gap);
+        padding: var(--pad);
+      }
+      .kpi {
+        background: var(--bg-card);
+        border: 1px solid var(--border-secondary);
+        border-radius: 16px;
+        padding: 16px;
+        transition: all 0.3s ease;
+      }
+      .kpi .v {
+        font-size: 28px;
+        font-weight: 800;
+      }
+      .kpi .t {
+        color: var(--text-secondary);
+        font-size: 12px;
+        margin-top: 6px;
+      }
+
+      .table {
+        padding: var(--pad);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        border-bottom: 1px solid var(--border-secondary);
+        padding: 10px 8px;
+        font-size: 13px;
+      }
+      th {
+        text-align: left;
+        color: var(--text-secondary);
+      }
+      .badge {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 999px;
+        font-size: 12px;
+        border: 1px solid var(--badge-border);
+        transition: all 0.3s ease;
+      }
+      .ok {
+        background: var(--ok-bg);
+        border-color: var(--ok-border);
+        color: var(--ok-text);
+      }
+      .warn {
+        background: var(--warn-bg);
+        border-color: var(--warn-border);
+        color: var(--warn-text);
+      }
+      .danger {
+        background: var(--danger-bg);
+        border-color: var(--danger-border);
+        color: var(--danger-text);
+      }
+
+      @media (max-width: 1100px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        .kpis {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .toolbar {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="header-top">
+        <div>
+          <h1>NCDs Dashboard</h1>
+          <div class="sub">
+            ตัวอย่างโครงเริ่มต้น: กรองตาม จังหวัด / อำเภอ / ตำบล / สถานะ
+            และสรุปภาพรวม
+          </div>
+        </div>
+        <button class="theme-toggle" id="theme-toggle">
+          <span class="theme-icon" id="theme-icon">🌙</span>
+          <span id="theme-text">โหมดสว่าง</span>
+        </button>
+      </div>
+
+      <div class="toolbar">
+        <div class="ctrl">
+          <label>จังหวัด</label>
+          <select id="f-province"></select>
+        </div>
+        <div class="ctrl">
+          <label>อำเภอ</label>
+          <select id="f-amphoe"></select>
+        </div>
+        <div class="ctrl">
+          <label>ตำบล</label>
+          <select id="f-tambon"></select>
+        </div>
+        <div class="ctrl">
+          <label>สถานะ</label>
+          <select id="f-status"></select>
+        </div>
+      </div>
+    </header>
+
+    <section class="kpis" id="kpis">
+      <div class="kpi">
+        <div class="v" id="kpi-total">-</div>
+        <div class="t">จำนวนรายการ</div>
+      </div>
+      <div class="kpi">
+        <div class="v" id="kpi-risk">-</div>
+        <div class="t">เสี่ยง (ภาพรวม NCDs)</div>
+      </div>
+      <div class="kpi">
+        <div class="v" id="kpi-ok">-</div>
+        <div class="t">ปกติ (ภาพรวม NCDs)</div>
+      </div>
+      <div class="kpi">
+        <div class="v" id="kpi-finish">-</div>
+        <div class="t">สถานะ = เสร็จสิ้น</div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <h3>ภาพรวมการประเมิน NCDs</h3>
+        <div id="chart-ncd" style="height: 320px"></div>
+      </div>
+
+      <div class="card">
+        <h3>สุขภาพรายปัจจัยเสี่ยง (นับสถานะ)</h3>
+        <div id="chart-factors" style="height: 320px"></div>
+      </div>
+
+      <div class="card">
+        <h3>Top ตำบลที่พบผู้รับการประเมิน</h3>
+        <div id="chart-tambon" style="height: 320px"></div>
+      </div>
+    </section>
+
+    <section class="table">
+      <div class="card">
+        <h3>รายการ (ตัวอย่างคอลัมน์หลัก)</h3>
+        <table id="tbl">
+          <thead>
+            <tr>
+              <th>ชื่อ</th>
+              <th>นามสกุล</th>
+              <th>ตำบล</th>
+              <th>อำเภอ</th>
+              <th>จังหวัด</th>
+              <th>เบอร์โทรศัพท์</th>
+              <th>ภาพรวม NCDs</th>
+              <th>สถานะ</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <script>
+      // ชื่อคอลัมน์ในชีต (ต้องตรงกับหัวตารางจริง)
+      const COL = {
+        fname: "ชื่อ",
+        lname: "นามสกุล",
+        village: "ชื่อหมู่บ้าน",
+        house: "บ้านเลขที่",
+        province: "จังหวัด",
+        amphoe: "อำเภอ",
+        tambon: "ตำบล",
+        phone: "เบอร์โทรศัพท์",
+        ncd: "ภาพรวมของการประเมินโรค NCDs",
+        obesity: "โรคอ้วน",
+        dm: "โรคเบาหวาน",
+        htn: "โรคความดันโลหิต",
+        mental: "สุขภาพจิต",
+        alcohol: "แอลกอฮอล์",
+        smoke: "สูบบุหรี่",
+        status: "สถานะ",
+        refer_to: "ส่งต่อหน่วยบริการ",
+        refer_code: "รหัสหน่วยบริการที่ส่งออก",
+      };
+
+      const state = {
+        raw: [],
+        filtered: [],
+        options: { province: [], amphoe: [], tambon: [], status: [] },
+        filters: { province: "", amphoe: "", tambon: "", status: "" },
+      };
+
+      const $ = (id) => document.getElementById(id);
+
+      // Theme Management
+      function initTheme() {
+        const savedTheme = localStorage.getItem("dashboard-theme") || "dark";
+        applyTheme(savedTheme);
+
+        $("theme-toggle").addEventListener("click", toggleTheme);
+      }
+
+      function applyTheme(theme) {
+        const body = document.body;
+        const icon = $("theme-icon");
+        const text = $("theme-text");
+
+        if (theme === "light") {
+          body.classList.add("light-theme");
+          icon.textContent = "☀️";
+          text.textContent = "โหมดมืด";
+        } else {
+          body.classList.remove("light-theme");
+          icon.textContent = "🌙";
+          text.textContent = "โหมดสว่าง";
+        }
+
+        localStorage.setItem("dashboard-theme", theme);
+
+        // Re-render charts with new theme
+        if (chNcd && chFactors && chTambon) {
+          updateChartsTheme();
+        }
+      }
+
+      function toggleTheme() {
+        const currentTheme = document.body.classList.contains("light-theme")
+          ? "light"
+          : "dark";
+        const newTheme = currentTheme === "dark" ? "light" : "dark";
+        applyTheme(newTheme);
+      }
+
+      function updateChartsTheme() {
+        const isDark = !document.body.classList.contains("light-theme");
+        const textColor = isDark ? "#e7e9ee" : "#1a1d2e";
+        const borderColor = isDark ? "#1c2342" : "#d1d5db";
+
+        const commonTheme = {
+          textStyle: { color: textColor },
+          axisLine: { lineStyle: { color: borderColor } },
+          axisTick: { lineStyle: { color: borderColor } },
+          splitLine: { lineStyle: { color: borderColor } },
+        };
+
+        if (chNcd) {
+          chNcd.dispose();
+          chNcd = echarts.init(document.getElementById("chart-ncd"));
+        }
+        if (chFactors) {
+          chFactors.dispose();
+          chFactors = echarts.init(document.getElementById("chart-factors"));
+        }
+        if (chTambon) {
+          chTambon.dispose();
+          chTambon = echarts.init(document.getElementById("chart-tambon"));
+        }
+
+        drawCharts();
+      }
+
+      function load() {
+        google.script.run
+          .withSuccessHandler(({ data }) => {
+            state.raw = data.map((x) => normalize(x));
+            computeOptions();
+            applyFilters();
+          })
+          .withFailureHandler((err) => {
+            alert("โหลดข้อมูลไม่สำเร็จ: " + err.message);
+            console.error(err);
+          })
+          .getDataObj();
+      }
+
+      function normalize(x) {
+        const t = (v) => (v == null ? "" : String(v).trim());
+        return {
+          ...x,
+          [COL.province]: t(x[COL.province]),
+          [COL.amphoe]: t(x[COL.amphoe]),
+          [COL.tambon]: t(x[COL.tambon]),
+          [COL.ncd]: t(x[COL.ncd]),
+          [COL.status]: t(x[COL.status]),
+          [COL.phone]: t(x[COL.phone])
+            .replace(/[^\d]/g, "")
+            .replace(/^0?/, "0"),
+        };
+      }
+
+      function computeOptions() {
+        const uniq = (arr) =>
+          Array.from(new Set(arr.filter(Boolean))).sort((a, b) =>
+            a.localeCompare(b, "th")
+          );
+        state.options.province = uniq(state.raw.map((r) => r[COL.province]));
+        state.options.amphoe = uniq(state.raw.map((r) => r[COL.amphoe]));
+        state.options.tambon = uniq(state.raw.map((r) => r[COL.tambon]));
+        state.options.status = uniq(state.raw.map((r) => r[COL.status]));
+        fillSelect("f-province", state.options.province);
+        fillSelect("f-amphoe", state.options.amphoe);
+        fillSelect("f-tambon", state.options.tambon);
+        fillSelect("f-status", state.options.status);
+        // default: all
+      }
+
+      function fillSelect(id, items) {
+        const el = $(id);
+        el.innerHTML =
+          `<option value="">ทั้งหมด</option>` +
+          items.map((x) => `<option>${x}</option>`).join("");
+        el.onchange = () => {
+          state.filters[id.split("-")[1]] = el.value;
+          applyFilters();
+        };
+      }
+
+      function applyFilters() {
+        const f = state.filters;
+        state.filtered = state.raw.filter(
+          (r) =>
+            (!f.province || r[COL.province] === f.province) &&
+            (!f.amphoe || r[COL.amphoe] === f.amphoe) &&
+            (!f.tambon || r[COL.tambon] === f.tambon) &&
+            (!f.status || r[COL.status] === f.status)
+        );
+
+        renderKpis();
+        renderTable();
+        drawCharts();
+      }
+
+      function renderKpis() {
+        const total = state.filtered.length;
+        const ncdRisk = state.filtered.filter((r) =>
+          includesThaiRisk(r[COL.ncd])
+        ).length;
+        const ncdOk = state.filtered.filter((r) =>
+          isThaiNormal(r[COL.ncd])
+        ).length;
+        const finished = state.filtered.filter((r) =>
+          (r[COL.status] || "").includes("เสร็จสิ้น")
+        ).length;
+
+        $("kpi-total").textContent = total;
+        $("kpi-risk").textContent = ncdRisk;
+        $("kpi-ok").textContent = ncdOk;
+        $("kpi-finish").textContent = finished;
+      }
+
+      function isThaiNormal(s) {
+        return ["ปกติ", "ปกติ ", " ปกติ"].includes((s || "").trim());
+      }
+      function includesThaiRisk(s) {
+        return (s || "").includes("เสี่ยง") || (s || "").includes("สูง");
+      }
+
+      function renderTable() {
+        const tbody = document.querySelector("#tbl tbody");
+        tbody.innerHTML = state.filtered
+          .slice(0, 200) // แสดงสูงสุด 200 แถว ตัวอย่าง
+          .map((r) => {
+            const n = r[COL.ncd] || "";
+            const badge = isThaiNormal(n)
+              ? "ok"
+              : includesThaiRisk(n)
+              ? "warn"
+              : "";
+            const s = r[COL.status] || "";
+            const sbadge = s.includes("เสร็จสิ้น") ? "ok" : s ? "warn" : "";
+            return `<tr>
+            <td>${r[COL.fname] || ""}</td>
+            <td>${r[COL.lname] || ""}</td>
+            <td>${r[COL.tambon] || ""}</td>
+            <td>${r[COL.amphoe] || ""}</td>
+            <td>${r[COL.province] || ""}</td>
+            <td>${prettyPhone(r[COL.phone])}</td>
+            <td><span class="badge ${badge}">${n || "-"}</span></td>
+            <td><span class="badge ${sbadge}">${s || "-"}</span></td>
+          </tr>`;
+          })
+          .join("");
+      }
+
+      function prettyPhone(p) {
+        if (!p) return "-";
+        if (p.length === 10)
+          return `${p.slice(0, 3)}-${p.slice(3, 6)}-${p.slice(6)}`;
+        return p;
+      }
+
+      /** ---------- Charts ---------- */
+      let chNcd, chFactors, chTambon;
+      function drawCharts() {
+        const el1 = document.getElementById("chart-ncd");
+        const el2 = document.getElementById("chart-factors");
+        const el3 = document.getElementById("chart-tambon");
+        chNcd = chNcd || echarts.init(el1);
+        chFactors = chFactors || echarts.init(el2);
+        chTambon = chTambon || echarts.init(el3);
+
+        const isDark = !document.body.classList.contains("light-theme");
+        const textColor = isDark ? "#e7e9ee" : "#1a1d2e";
+        const axisLineColor = isDark ? "#1c2342" : "#d1d5db";
+
+        // 1) ภาพรวม NCDs
+        const ncdCounts = countBy(state.filtered, (r) => norm(r[COL.ncd]));
+        chNcd.setOption({
+          tooltip: { trigger: "axis" },
+          textStyle: { color: textColor },
+          xAxis: {
+            type: "category",
+            data: Object.keys(ncdCounts),
+            axisLabel: { color: textColor },
+            axisLine: { lineStyle: { color: axisLineColor } },
+          },
+          yAxis: {
+            type: "value",
+            axisLabel: { color: textColor },
+            axisLine: { lineStyle: { color: axisLineColor } },
+            splitLine: { lineStyle: { color: axisLineColor } },
+          },
+          series: [{ type: "bar", data: Object.values(ncdCounts) }],
+        });
+
+        // 2) ปัจจัยเสี่ยง (นับสถานะ ปกติ/เสี่ยง/อื่นๆ)
+        const keys = [
+          COL.obesity,
+          COL.dm,
+          COL.htn,
+          COL.mental,
+          COL.alcohol,
+          COL.smoke,
+        ];
+        const labels = [
+          "โรคอ้วน",
+          "เบาหวาน",
+          "ความดัน",
+          "สุขภาพจิต",
+          "แอลกอฮอล์",
+          "สูบบุหรี่",
+        ];
+        const normal = [],
+          risk = [],
+          other = [];
+        keys.forEach((k, i) => {
+          const group = state.filtered.map((r) => norm(r[k]));
+          normal.push(group.filter(isThaiNormal).length);
+          risk.push(group.filter(includesThaiRisk).length);
+          other.push(
+            group.filter((s) => s && !isThaiNormal(s) && !includesThaiRisk(s))
+              .length
+          );
+        });
+        chFactors.setOption({
+          tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+          legend: {
+            data: ["ปกติ", "เสี่ยง", "อื่น ๆ"],
+            textStyle: { color: textColor },
+          },
+          textStyle: { color: textColor },
+          grid: { left: "3%", right: "4%", bottom: "3%", containLabel: true },
+          xAxis: {
+            type: "category",
+            data: labels,
+            axisLabel: { color: textColor },
+            axisLine: { lineStyle: { color: axisLineColor } },
+          },
+          yAxis: {
+            type: "value",
+            axisLabel: { color: textColor },
+            axisLine: { lineStyle: { color: axisLineColor } },
+            splitLine: { lineStyle: { color: axisLineColor } },
+          },
+          series: [
+            { name: "ปกติ", type: "bar", stack: "total", data: normal },
+            { name: "เสี่ยง", type: "bar", stack: "total", data: risk },
+            { name: "อื่น ๆ", type: "bar", stack: "total", data: other },
+          ],
+        });
+
+        // 3) Top ตำบล
+        const tb = Object.entries(
+          countBy(state.filtered, (r) => norm(r[COL.tambon]))
+        )
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 10);
+        chTambon.setOption({
+          tooltip: { trigger: "axis" },
+          textStyle: { color: textColor },
+          xAxis: {
+            type: "value",
+            axisLabel: { color: textColor },
+            axisLine: { lineStyle: { color: axisLineColor } },
+            splitLine: { lineStyle: { color: axisLineColor } },
+          },
+          yAxis: {
+            type: "category",
+            data: tb.map((x) => x[0]).reverse(),
+            axisLabel: { color: textColor },
+            axisLine: { lineStyle: { color: axisLineColor } },
+          },
+          series: [{ type: "bar", data: tb.map((x) => x[1]).reverse() }],
+        });
+
+        window.addEventListener(
+          "resize",
+          () => {
+            chNcd.resize();
+            chFactors.resize();
+            chTambon.resize();
+          },
+          { once: true }
+        );
+      }
+
+      function norm(s) {
+        return (s || "").toString().trim();
+      }
+      function countBy(arr, by) {
+        return arr.reduce((acc, x) => {
+          const k = by(x) || "-";
+          acc[k] = (acc[k] || 0) + 1;
+          return acc;
+        }, {});
+      }
+
+      // Initialize theme on page load
+      initTheme();
+      load();
+    </script>
+  </body>
+</html>
