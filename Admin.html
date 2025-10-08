@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🔧 Admin Panel - NCDs Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+
+    <?!= HtmlService.createHtmlOutputFromFile('Styles').getContent(); ?>
+  </head>
+  <body>
+    <!-- Admin Header -->
+    <header>
+      <div class="header-top">
+        <div>
+          <h1>🔧 Admin Panel</h1>
+          <div class="sub">จัดการข้อมูล NCDs Dashboard</div>
+        </div>
+        <div class="actions">
+          <span style="color: var(--text-secondary); font-size: 13px; margin-right: 10px;">
+            👤 <span id="username-display"></span>
+          </span>
+          <button class="btn btn-primary" id="add-record-btn">
+            <span>➕</span>
+            <span>เพิ่มรายการ</span>
+          </button>
+          <button class="btn btn-secondary" id="import-btn">
+            <span>📥</span>
+            <span>นำเข้าข้อมูล</span>
+          </button>
+          <button class="btn btn-secondary" id="logout-btn">
+            <span>🚪</span>
+            <span>ออกจากระบบ</span>
+          </button>
+          <button class="btn btn-secondary" id="theme-toggle" title="สลับธีม">
+            🌙
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Quick Links -->
+    <div style="padding: var(--pad); border-bottom: 1px solid var(--border-primary);">
+      <a href="#" id="back-to-dashboard" 
+         style="color: var(--border-focus); text-decoration: none; font-size: 14px; font-weight: 500;">
+        ← กลับไปหน้า Dashboard
+      </a>
+    </div>
+
+    <!-- Add Record Modal -->
+    <?!= HtmlService.createHtmlOutputFromFile('Modals').getContent(); ?>
+
+    <!-- Admin Scripts -->
+    <?!= HtmlService.createHtmlOutputFromFile('AdminScripts').getContent(); ?>
+    
+    <script>
+      // ตั้งค่า back link
+      document.addEventListener("DOMContentLoaded", function() {
+        google.script.run
+          .withSuccessHandler((url) => {
+            document.getElementById("back-to-dashboard").href = url;
+          })
+          .getWebAppUrl();
+      });
+    </script>
+  </body>
+</html>

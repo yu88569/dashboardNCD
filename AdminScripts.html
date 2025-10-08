@@ -1,0 +1,273 @@
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  /* ============================================
+   Theme Management
+   ============================================ */
+  function initTheme() {
+    const saved = localStorage.getItem("theme") || "dark";
+    applyTheme(saved);
+
+    const btn = $("theme-toggle");
+    btn.addEventListener("click", toggleTheme);
+  }
+
+  function applyTheme(theme) {
+    if (theme === "light") {
+      document.body.classList.add("light-theme");
+      $("theme-toggle").textContent = "☀️";
+    } else {
+      document.body.classList.remove("light-theme");
+      $("theme-toggle").textContent = "🌙";
+    }
+    localStorage.setItem("theme", theme);
+  }
+
+  function toggleTheme() {
+    const isLight = document.body.classList.contains("light-theme");
+    applyTheme(isLight ? "dark" : "light");
+  }
+
+  /* ============================================
+   Session Management
+   ============================================ */
+  function checkSession() {
+    google.script.run
+      .withSuccessHandler((result) => {
+        if (!result.success) {
+          // ถ้าไม่มี session ให้ไป login (backend จะ redirect อัตโนมัติ)
+          alert("Session หมดอายุ กรุณา login ใหม่");
+          window.location.reload();
+        } else {
+          $("username-display").textContent = result.username;
+        }
+      })
+      .withFailureHandler(() => {
+        alert("เกิดข้อผิดพลาด กรุณา login ใหม่");
+        window.location.reload();
+      })
+      .checkSession();
+  }
+
+  function initLogout() {
+    $("logout-btn").onclick = () => {
+      if (confirm("คุณต้องการออกจากระบบหรือไม่?")) {
+        google.script.run
+          .withSuccessHandler((result) => {
+            // ออกจากระบบสำเร็จ กลับไปหน้า Dashboard
+            window.location.href = result.redirectUrl;
+          })
+          .withFailureHandler((err) => {
+            alert("เกิดข้อผิดพลาด: " + err.message);
+            // ลอง redirect อีกครั้ง
+            google.script.run
+              .withSuccessHandler((url) => {
+                window.location.href = url;
+              })
+              .getWebAppUrl();
+          })
+          .logout();
+      }
+    };
+  }
+
+  /* ============================================
+   Add Record Form
+   ============================================ */
+  function initAddRecordForm() {
+    const modal = $("add-record-modal");
+    const form = $("record-form");
+    const alert = $("add-record-alert");
+
+    $("add-record-btn").onclick = () => modal.classList.add("show");
+    $("close-add-record").onclick = closeAddRecordModal;
+    $("cancel-add-record").onclick = closeAddRecordModal;
+
+    function closeAddRecordModal() {
+      modal.classList.remove("show");
+      form.reset();
+      alert.className = "alert";
+    }
+
+    form.onsubmit = (e) => {
+      e.preventDefault();
+      const formData = new FormData(form);
+      const record = {};
+      formData.forEach((val, key) => (record[key] = val));
+
+      showAlert(alert, "กำลังบันทึก...", "");
+      $("submit-record").disabled = true;
+
+      google.script.run
+        .withSuccessHandler((result) => {
+          if (result.success) {
+            showAlert(alert, "✅ " + result.message, "success");
+            $("submit-record").disabled = false;
+            setTimeout(() => {
+              closeAddRecordModal();
+            }, 1500);
+          } else {
+            showAlert(alert, "❌ " + result.message, "error");
+            $("submit-record").disabled = false;
+          }
+        })
+        .withFailureHandler((err) => {
+          showAlert(alert, "❌ เกิดข้อผิดพลาด: " + err.message, "error");
+          $("submit-record").disabled = false;
+        })
+        .addSingleRecord(record);
+    };
+  }
+
+  /* ============================================
+   Import Data
+   ============================================ */
+  function initImportData() {
+    const modal = $("import-modal");
+    const fileInput = $("file-input");
+    const fileLabel = $("file-label");
+    const fileName = $("file-name");
+    const fileSelected = $("file-selected");
+    const uploadBtn = $("upload-btn");
+    const alert = $("import-alert");
+    let selectedFile = null;
+
+    $("import-btn").onclick = () => modal.classList.add("show");
+    $("close-modal").onclick = closeImportModal;
+    $("cancel-btn").onclick = closeImportModal;
+
+    function closeImportModal() {
+      modal.classList.remove("show");
+      fileInput.value = "";
+      fileSelected.classList.remove("show");
+      uploadBtn.disabled = true;
+      alert.className = "alert";
+      selectedFile = null;
+    }
+
+    // Download Template
+    $("download-template").onclick = () => {
+      showAlert(alert, "กำลังสร้าง Template...", "");
+      google.script.run
+        .withSuccessHandler((result) => {
+          if (result.success) {
+            showAlert(alert, "✅ " + result.message, "success");
+            window.open(result.url, "_blank");
+          } else {
+            showAlert(alert, "❌ " + result.message, "error");
+          }
+        })
+        .withFailureHandler((err) => {
+          showAlert(alert, "❌ เกิดข้อผิดพลาด: " + err.message, "error");
+        })
+        .getTemplateUrl();
+    };
+
+    // File Selection
+    fileInput.onchange = (e) => {
+      const file = e.target.files[0];
+      if (file) handleFileSelect(file);
+    };
+
+    // Drag & Drop
+    fileLabel.ondragover = (e) => {
+      e.preventDefault();
+      fileLabel.classList.add("dragover");
+    };
+    fileLabel.ondragleave = () => fileLabel.classList.remove("dragover");
+    fileLabel.ondrop = (e) => {
+      e.preventDefault();
+      fileLabel.classList.remove("dragover");
+      const file = e.dataTransfer.files[0];
+      if (file) handleFileSelect(file);
+    };
+
+    function handleFileSelect(file) {
+      const validTypes = [
+        "text/csv",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      ];
+      if (
+        !validTypes.includes(file.type) &&
+        !file.name.match(/\.(csv|xlsx|xls)$/i)
+      ) {
+        showAlert(alert, "❌ กรุณาเลือกไฟล์ CSV หรือ Excel", "error");
+        return;
+      }
+      selectedFile = file;
+      fileName.textContent = `📄 ${file.name}`;
+      fileSelected.classList.add("show");
+      uploadBtn.disabled = false;
+      alert.className = "alert";
+    }
+
+    // Upload
+    uploadBtn.onclick = () => {
+      if (!selectedFile) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target.result;
+        const csvData = selectedFile.name.match(/\.csv$/i)
+          ? content
+          : parseExcelToCSV(content);
+
+        showAlert(alert, "กำลังอัปโหลด...", "");
+        uploadBtn.disabled = true;
+
+        google.script.run
+          .withSuccessHandler((result) => {
+            if (result.success) {
+              showAlert(
+                alert,
+                `✅ ${result.message}`,
+                "success"
+              );
+            } else {
+              showAlert(alert, "❌ " + result.message, "error");
+            }
+            uploadBtn.disabled = false;
+            setTimeout(() => {
+              closeImportModal();
+            }, 2000);
+          })
+          .withFailureHandler((err) => {
+            showAlert(alert, "❌ เกิดข้อผิดพลาด: " + err.message, "error");
+            uploadBtn.disabled = false;
+          })
+          .importData(csvData);
+      };
+
+      if (selectedFile.name.match(/\.csv$/i)) {
+        reader.readAsText(selectedFile, "UTF-8");
+      } else {
+        reader.readAsBinaryString(selectedFile);
+      }
+    };
+
+    function parseExcelToCSV(data) {
+      // Simplified Excel to CSV (ในการใช้งานจริงควรใช้ library เช่น SheetJS)
+      return data; // Placeholder
+    }
+  }
+
+  /* ============================================
+   Utility Functions
+   ============================================ */
+  function showAlert(el, msg, type) {
+    el.textContent = msg;
+    el.className = `alert ${type} show`;
+  }
+
+  /* ============================================
+   Application Initialization
+   ============================================ */
+  (function () {
+    initTheme();
+    checkSession();
+    initLogout();
+    initAddRecordForm();
+    initImportData();
+  })();
+</script>

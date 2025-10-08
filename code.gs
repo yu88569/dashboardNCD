@@ -1,6 +1,7 @@
 /** ====== CONFIG ====== **/
 const SHEET_ID = "1e7US3de5RqD75fsx-i6kLdebYHrClSC0lNZQmfYUEQk";
 const SHEET_NAME = "ncd_db_central";
+const USER_SHEET_NAME = "user";
 const CACHE_TTL_SECONDS = 300;
 
 /** ====== UTILITY: MASK NAME FOR PRIVACY ====== **/
@@ -32,10 +33,146 @@ function maskName(name) {
 }
 
 /** ====== ENTRYPOINT ====== **/
-function doGet() {
+function doGet(e) {
+  const page = e.parameter.page;
+  
+  // ถ้าเรียก admin panel ต้องเช็ค session
+  if (page === "admin") {
+    const session = getSession();
+    if (!session) {
+      return HtmlService.createTemplateFromFile("Login")
+        .evaluate()
+        .setTitle("Login - NCDs Dashboard")
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+    return HtmlService.createTemplateFromFile("Admin")
+      .evaluate()
+      .setTitle("Admin Panel - NCDs Dashboard")
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
+  
+  // หน้า dashboard ปกติ
   return HtmlService.createTemplateFromFile("index")
     .evaluate()
-    .setTitle("NCDs Dashboard");
+    .setTitle("NCDs Dashboard")
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/** ====== GET WEB APP URL ====== **/
+function getWebAppUrl() {
+  return ScriptApp.getService().getUrl();
+}
+
+/** ====== AUTHENTICATION ====== **/
+function login(username, password) {
+  try {
+    const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(USER_SHEET_NAME);
+    if (!sh) {
+      return { success: false, message: "ไม่พบตาราง user" };
+    }
+    
+    const data = sh.getDataRange().getValues();
+    if (data.length < 2) {
+      return { success: false, message: "ไม่มีข้อมูล user" };
+    }
+    
+    const [headers, ...rows] = data;
+    const userIdx = headers.findIndex(h => String(h).trim().toLowerCase() === "username");
+    const passIdx = headers.findIndex(h => String(h).trim().toLowerCase() === "password");
+    
+    if (userIdx === -1 || passIdx === -1) {
+      return { success: false, message: "โครงสร้างตารางไม่ถูกต้อง" };
+    }
+    
+    const user = rows.find(row => 
+      String(row[userIdx]).trim() === username && 
+      String(row[passIdx]).trim() === password
+    );
+    
+    if (user) {
+      // เก็บ session (ใช้ Properties Service)
+      const sessionId = Utilities.getUuid();
+      const userProperties = PropertiesService.getUserProperties();
+      userProperties.setProperty("sessionId", sessionId);
+      userProperties.setProperty("username", username);
+      userProperties.setProperty("loginTime", new Date().getTime().toString());
+      
+      return { 
+        success: true, 
+        message: "เข้าสู่ระบบสำเร็จ",
+        sessionId: sessionId,
+        username: username,
+        redirectUrl: ScriptApp.getService().getUrl() + "?page=admin"
+      };
+    } else {
+      return { success: false, message: "username หรือ password ไม่ถูกต้อง" };
+    }
+  } catch (error) {
+    return { success: false, message: "เกิดข้อผิดพลาด: " + error.toString() };
+  }
+}
+
+function logout() {
+  try {
+    const userProperties = PropertiesService.getUserProperties();
+    userProperties.deleteProperty("sessionId");
+    userProperties.deleteProperty("username");
+    userProperties.deleteProperty("loginTime");
+    return { 
+      success: true, 
+      message: "ออกจากระบบสำเร็จ",
+      redirectUrl: ScriptApp.getService().getUrl()
+    };
+  } catch (error) {
+    return { 
+      success: false, 
+      message: "เกิดข้อผิดพลาด: " + error.toString(),
+      redirectUrl: ScriptApp.getService().getUrl()
+    };
+  }
+}
+
+function getSession() {
+  try {
+    const userProperties = PropertiesService.getUserProperties();
+    const sessionId = userProperties.getProperty("sessionId");
+    const username = userProperties.getProperty("username");
+    const loginTime = userProperties.getProperty("loginTime");
+    
+    if (!sessionId || !username) {
+      return null;
+    }
+    
+    // ตรวจสอบว่า session หมดอายุหรือไม่ (24 ชั่วโมง)
+    const now = new Date().getTime();
+    const login = parseInt(loginTime);
+    const hoursPassed = (now - login) / (1000 * 60 * 60);
+    
+    if (hoursPassed > 24) {
+      logout();
+      return null;
+    }
+    
+    return {
+      sessionId: sessionId,
+      username: username,
+      loginTime: new Date(login)
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+function checkSession() {
+  const session = getSession();
+  if (session) {
+    return { 
+      success: true, 
+      username: session.username,
+      loginTime: session.loginTime
+    };
+  }
+  return { success: false };
 }
 
 /** ====== SERVER: RETURN DATA OBJECT ====== **/

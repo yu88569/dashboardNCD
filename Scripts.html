@@ -344,172 +344,28 @@
     }, {});
   }
 
-  /* ============================================
-   Add Record Form
-   ============================================ */
-  function initAddRecordForm() {
-    const modal = $("add-record-modal");
-    const form = $("record-form");
-    const alert = $("add-record-alert");
 
-    $("add-record-btn").onclick = () => modal.classList.add("show");
-    $("close-add-record").onclick = closeAddRecordModal;
-    $("cancel-add-record").onclick = closeAddRecordModal;
-
-    function closeAddRecordModal() {
-      modal.classList.remove("show");
-      form.reset();
-      alert.className = "alert";
-    }
-
-    form.onsubmit = (e) => {
-      e.preventDefault();
-      const formData = new FormData(form);
-      const record = {};
-      formData.forEach((val, key) => (record[key] = val));
-
-      showAlert(alert, "กำลังบันทึก...", "");
-      $("submit-record").disabled = true;
-
-      google.script.run
-        .withSuccessHandler(() => {
-          showAlert(alert, "✅ บันทึกสำเร็จ!", "success");
-          $("submit-record").disabled = false;
-          setTimeout(() => {
-            closeAddRecordModal();
-            load();
-          }, 1500);
-        })
-        .withFailureHandler((err) => {
-          showAlert(alert, "❌ เกิดข้อผิดพลาด: " + err.message, "error");
-          $("submit-record").disabled = false;
-        })
-        .addSingleRecord(record);
-    };
-  }
 
   /* ============================================
-   Import Data
+   Navigation
    ============================================ */
-  function initImportData() {
-    const modal = $("import-modal");
-    const fileInput = $("file-input");
-    const fileLabel = $("file-label");
-    const fileName = $("file-name");
-    const fileSelected = $("file-selected");
-    const uploadBtn = $("upload-btn");
-    const alert = $("import-alert");
-    let selectedFile = null;
-
-    $("import-btn").onclick = () => modal.classList.add("show");
-    $("close-modal").onclick = closeImportModal;
-    $("cancel-btn").onclick = closeImportModal;
-
-    function closeImportModal() {
-      modal.classList.remove("show");
-      fileInput.value = "";
-      fileSelected.classList.remove("show");
-      uploadBtn.disabled = true;
-      alert.className = "alert";
-      selectedFile = null;
-    }
-
-    // Download Template
-    $("download-template").onclick = () => {
-      showAlert(alert, "กำลังสร้าง Template...", "");
-      google.script.run
-        .withSuccessHandler((url) => {
-          showAlert(alert, "✅ สร้าง Template สำเร็จ!", "success");
-          window.open(url, "_blank");
-        })
-        .withFailureHandler((err) => {
-          showAlert(alert, "❌ เกิดข้อผิดพลาด: " + err.message, "error");
-        })
-        .getTemplateUrl();
-    };
-
-    // File Selection
-    fileInput.onchange = (e) => {
-      const file = e.target.files[0];
-      if (file) handleFileSelect(file);
-    };
-
-    // Drag & Drop
-    fileLabel.ondragover = (e) => {
-      e.preventDefault();
-      fileLabel.classList.add("dragover");
-    };
-    fileLabel.ondragleave = () => fileLabel.classList.remove("dragover");
-    fileLabel.ondrop = (e) => {
-      e.preventDefault();
-      fileLabel.classList.remove("dragover");
-      const file = e.dataTransfer.files[0];
-      if (file) handleFileSelect(file);
-    };
-
-    function handleFileSelect(file) {
-      const validTypes = [
-        "text/csv",
-        "application/vnd.ms-excel",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      ];
-      if (
-        !validTypes.includes(file.type) &&
-        !file.name.match(/\.(csv|xlsx|xls)$/i)
-      ) {
-        showAlert(alert, "❌ กรุณาเลือกไฟล์ CSV หรือ Excel", "error");
-        return;
-      }
-      selectedFile = file;
-      fileName.textContent = `📄 ${file.name}`;
-      fileSelected.classList.add("show");
-      uploadBtn.disabled = false;
-      alert.className = "alert";
-    }
-
-    // Upload
-    uploadBtn.onclick = () => {
-      if (!selectedFile) return;
-
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const content = e.target.result;
-        const csvData = selectedFile.name.match(/\.csv$/i)
-          ? content
-          : parseExcelToCSV(content);
-
-        showAlert(alert, "กำลังอัปโหลด...", "");
-        uploadBtn.disabled = true;
-
+  function initNavigation() {
+    const adminLoginBtn = $("admin-login-btn");
+    if (adminLoginBtn) {
+      adminLoginBtn.onclick = () => {
+        // ดึง URL จาก server และเพิ่ม query parameter
         google.script.run
-          .withSuccessHandler((result) => {
-            showAlert(
-              alert,
-              `✅ นำเข้าสำเร็จ ${result.count} รายการ`,
-              "success"
-            );
-            setTimeout(() => {
-              closeImportModal();
-              load();
-            }, 2000);
+          .withSuccessHandler((url) => {
+            window.location.href = url + "?page=admin";
           })
           .withFailureHandler((err) => {
-            showAlert(alert, "❌ เกิดข้อผิดพลาด: " + err.message, "error");
-            uploadBtn.disabled = false;
+            console.error("Error:", err);
+            // Fallback: ลองใช้ current URL
+            const currentUrl = window.location.href.split('?')[0];
+            window.location.href = currentUrl + "?page=admin";
           })
-          .importData(csvData);
+          .getWebAppUrl();
       };
-
-      if (selectedFile.name.match(/\.csv$/i)) {
-        reader.readAsText(selectedFile, "UTF-8");
-      } else {
-        reader.readAsBinaryString(selectedFile);
-      }
-    };
-
-    function parseExcelToCSV(data) {
-      // Simplified Excel to CSV (ในการใช้งานจริงควรใช้ library เช่น SheetJS)
-      return data; // Placeholder
     }
   }
 
@@ -526,8 +382,7 @@
    ============================================ */
   (function () {
     initTheme();
-    initAddRecordForm();
-    initImportData();
+    initNavigation();
     load();
   })();
 </script>
