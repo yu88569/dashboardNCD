@@ -1,0 +1,533 @@
+<script>
+  /* ============================================
+   Configuration & State
+   ============================================ */
+  const COL = {
+    fname: "ชื่อ",
+    lname: "นามสกุล",
+    village: "ชื่อหมู่บ้าน",
+    house: "บ้านเลขที่",
+    province: "จังหวัด",
+    amphoe: "อำเภอ",
+    tambon: "ตำบล",
+    phone: "เบอร์โทรศัพท์",
+    ncd: "ภาพรวมของการประเมินโรค NCDs",
+    obesity: "โรคอ้วน",
+    dm: "โรคเบาหวาน",
+    htn: "โรคความดันโลหิต",
+    mental: "สุขภาพจิต",
+    smoke: "สูบบุหรี่",
+    alcohol: "แอลกอฮอล์",
+    status: "สถานะ",
+    refer: "ส่งต่อหน่วยบริการ",
+    referCode: "รหัสหน่วยบริการที่ส่งออก",
+  };
+
+  const state = {
+    raw: [],
+    filtered: [],
+    options: { province: [], amphoe: [], tambon: [], status: [] },
+    filters: { province: "", amphoe: "", tambon: "", status: "" },
+  };
+
+  const $ = (id) => document.getElementById(id);
+
+  /* ============================================
+   Theme Management
+   ============================================ */
+  function initTheme() {
+    const saved = localStorage.getItem("theme") || "dark";
+    applyTheme(saved);
+
+    const btn = $("theme-toggle");
+    btn.addEventListener("click", toggleTheme);
+  }
+
+  function applyTheme(theme) {
+    if (theme === "light") {
+      document.body.classList.add("light-theme");
+      $("theme-toggle").textContent = "☀️";
+    } else {
+      document.body.classList.remove("light-theme");
+      $("theme-toggle").textContent = "🌙";
+    }
+    localStorage.setItem("theme", theme);
+
+    // อัปเดตกราฟถ้ามี
+    if (window.chNcd) updateChartsTheme();
+  }
+
+  function toggleTheme() {
+    const isLight = document.body.classList.contains("light-theme");
+    applyTheme(isLight ? "dark" : "light");
+  }
+
+  function updateChartsTheme() {
+    if (window.chNcd) {
+      window.chNcd.dispose();
+      window.chFactors.dispose();
+      window.chTambon.dispose();
+      window.chNcd = null;
+      window.chFactors = null;
+      window.chTambon = null;
+      drawCharts();
+    }
+  }
+
+  /* ============================================
+   Data Management
+   ============================================ */
+  function load() {
+    google.script.run
+      .withSuccessHandler(({ data }) => {
+        state.raw = data.map((x) => normalize(x));
+        computeOptions();
+        applyFilters();
+      })
+      .withFailureHandler((err) => {
+        alert("โหลดข้อมูลไม่สำเร็จ: " + err.message);
+        console.error(err);
+      })
+      .getDataObj();
+  }
+
+  function normalize(x) {
+    const t = (v) => (v == null ? "" : String(v).trim());
+    return {
+      ...x,
+      [COL.province]: t(x[COL.province]),
+      [COL.amphoe]: t(x[COL.amphoe]),
+      [COL.tambon]: t(x[COL.tambon]),
+      [COL.ncd]: t(x[COL.ncd]),
+      [COL.status]: t(x[COL.status]),
+      [COL.phone]: t(x[COL.phone]).replace(/[^\d]/g, "").replace(/^0?/, "0"),
+    };
+  }
+
+  function computeOptions() {
+    const uniq = (arr) =>
+      Array.from(new Set(arr.filter(Boolean))).sort((a, b) =>
+        a.localeCompare(b, "th")
+      );
+    state.options.province = uniq(state.raw.map((r) => r[COL.province]));
+    state.options.amphoe = uniq(state.raw.map((r) => r[COL.amphoe]));
+    state.options.tambon = uniq(state.raw.map((r) => r[COL.tambon]));
+    state.options.status = uniq(state.raw.map((r) => r[COL.status]));
+    fillSelect("f-province", state.options.province);
+    fillSelect("f-amphoe", state.options.amphoe);
+    fillSelect("f-tambon", state.options.tambon);
+    fillSelect("f-status", state.options.status);
+  }
+
+  function fillSelect(id, items) {
+    const el = $(id);
+    el.innerHTML =
+      `<option value="">ทั้งหมด</option>` +
+      items.map((x) => `<option>${x}</option>`).join("");
+    el.onchange = () => {
+      state.filters[id.split("-")[1]] = el.value;
+      applyFilters();
+    };
+  }
+
+  function applyFilters() {
+    const f = state.filters;
+    state.filtered = state.raw.filter(
+      (r) =>
+        (!f.province || r[COL.province] === f.province) &&
+        (!f.amphoe || r[COL.amphoe] === f.amphoe) &&
+        (!f.tambon || r[COL.tambon] === f.tambon) &&
+        (!f.status || r[COL.status] === f.status)
+    );
+
+    renderKpis();
+    renderTable();
+    drawCharts();
+  }
+
+  /* ============================================
+   UI Rendering
+   ============================================ */
+  function renderKpis() {
+    const total = state.filtered.length;
+    const ncdRisk = state.filtered.filter((r) =>
+      includesThaiRisk(r[COL.ncd])
+    ).length;
+    const ncdOk = state.filtered.filter((r) => isThaiNormal(r[COL.ncd])).length;
+    const finished = state.filtered.filter((r) =>
+      (r[COL.status] || "").includes("เสร็จสิ้น")
+    ).length;
+
+    $("kpi-total").textContent = total;
+    $("kpi-risk").textContent = ncdRisk;
+    $("kpi-ok").textContent = ncdOk;
+    $("kpi-finish").textContent = finished;
+  }
+
+  function isThaiNormal(s) {
+    return ["ปกติ", "ปกติ ", " ปกติ"].includes((s || "").trim());
+  }
+
+  function includesThaiRisk(s) {
+    return (s || "").includes("เสี่ยง") || (s || "").includes("สูง");
+  }
+
+  function renderTable() {
+    const tbody = document.querySelector("#tbl tbody");
+    tbody.innerHTML = state.filtered
+      .slice(0, 200)
+      .map((r) => {
+        const n = r[COL.ncd] || "";
+        const badge = isThaiNormal(n)
+          ? "ok"
+          : includesThaiRisk(n)
+          ? "warn"
+          : "";
+        const s = r[COL.status] || "";
+        const sbadge = s.includes("เสร็จสิ้น") ? "ok" : s ? "warn" : "";
+        return `<tr>
+        <td>${r[COL.fname] || ""}</td>
+        <td>${r[COL.lname] || ""}</td>
+        <td>${r[COL.tambon] || ""}</td>
+        <td>${r[COL.amphoe] || ""}</td>
+        <td>${r[COL.province] || ""}</td>
+        <td>${prettyPhone(r[COL.phone])}</td>
+        <td><span class="badge ${badge}">${n || "-"}</span></td>
+        <td><span class="badge ${sbadge}">${s || "-"}</span></td>
+      </tr>`;
+      })
+      .join("");
+  }
+
+  function prettyPhone(p) {
+    if (!p) return "-";
+    if (p.length === 10)
+      return `${p.slice(0, 3)}-${p.slice(3, 6)}-${p.slice(6)}`;
+    return p;
+  }
+
+  /* ============================================
+   Charts
+   ============================================ */
+  function drawCharts() {
+    const el1 = document.getElementById("chart-ncd");
+    const el2 = document.getElementById("chart-factors");
+    const el3 = document.getElementById("chart-tambon");
+    window.chNcd = window.chNcd || echarts.init(el1);
+    window.chFactors = window.chFactors || echarts.init(el2);
+    window.chTambon = window.chTambon || echarts.init(el3);
+
+    const isDark = !document.body.classList.contains("light-theme");
+    const textColor = isDark ? "#e7e9ee" : "#1a1d2e";
+    const axisLineColor = isDark ? "#1c2342" : "#d1d5db";
+
+    // 1) ภาพรวม NCDs
+    const ncdCounts = countBy(state.filtered, (r) => norm(r[COL.ncd]));
+    window.chNcd.setOption({
+      tooltip: { trigger: "axis" },
+      textStyle: { color: textColor },
+      xAxis: {
+        type: "category",
+        data: Object.keys(ncdCounts),
+        axisLabel: { color: textColor },
+        axisLine: { lineStyle: { color: axisLineColor } },
+      },
+      yAxis: {
+        type: "value",
+        axisLabel: { color: textColor },
+        axisLine: { lineStyle: { color: axisLineColor } },
+        splitLine: { lineStyle: { color: axisLineColor } },
+      },
+      series: [{ type: "bar", data: Object.values(ncdCounts) }],
+    });
+
+    // 2) ปัจจัยเสี่ยง
+    const keys = [
+      COL.obesity,
+      COL.dm,
+      COL.htn,
+      COL.mental,
+      COL.alcohol,
+      COL.smoke,
+    ];
+    const labels = [
+      "โรคอ้วน",
+      "เบาหวาน",
+      "ความดัน",
+      "สุขภาพจิต",
+      "แอลกอฮอล์",
+      "สูบบุหรี่",
+    ];
+    const normal = [],
+      risk = [],
+      other = [];
+    keys.forEach((k, i) => {
+      const group = state.filtered.map((r) => norm(r[k]));
+      normal.push(group.filter(isThaiNormal).length);
+      risk.push(group.filter(includesThaiRisk).length);
+      other.push(
+        group.filter((s) => s && !isThaiNormal(s) && !includesThaiRisk(s))
+          .length
+      );
+    });
+    window.chFactors.setOption({
+      tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
+      legend: {
+        data: ["ปกติ", "เสี่ยง", "อื่น ๆ"],
+        textStyle: { color: textColor },
+      },
+      textStyle: { color: textColor },
+      grid: { left: "3%", right: "4%", bottom: "3%", containLabel: true },
+      xAxis: {
+        type: "category",
+        data: labels,
+        axisLabel: { color: textColor },
+        axisLine: { lineStyle: { color: axisLineColor } },
+      },
+      yAxis: {
+        type: "value",
+        axisLabel: { color: textColor },
+        axisLine: { lineStyle: { color: axisLineColor } },
+        splitLine: { lineStyle: { color: axisLineColor } },
+      },
+      series: [
+        { name: "ปกติ", type: "bar", stack: "total", data: normal },
+        { name: "เสี่ยง", type: "bar", stack: "total", data: risk },
+        { name: "อื่น ๆ", type: "bar", stack: "total", data: other },
+      ],
+    });
+
+    // 3) Top ตำบล
+    const tb = Object.entries(
+      countBy(state.filtered, (r) => norm(r[COL.tambon]))
+    )
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+    window.chTambon.setOption({
+      tooltip: { trigger: "axis" },
+      textStyle: { color: textColor },
+      xAxis: {
+        type: "value",
+        axisLabel: { color: textColor },
+        axisLine: { lineStyle: { color: axisLineColor } },
+        splitLine: { lineStyle: { color: axisLineColor } },
+      },
+      yAxis: {
+        type: "category",
+        data: tb.map((x) => x[0]).reverse(),
+        axisLabel: { color: textColor },
+        axisLine: { lineStyle: { color: axisLineColor } },
+      },
+      series: [{ type: "bar", data: tb.map((x) => x[1]).reverse() }],
+    });
+
+    window.addEventListener(
+      "resize",
+      () => {
+        window.chNcd.resize();
+        window.chFactors.resize();
+        window.chTambon.resize();
+      },
+      { once: true }
+    );
+  }
+
+  function norm(s) {
+    return (s || "").toString().trim();
+  }
+
+  function countBy(arr, by) {
+    return arr.reduce((acc, x) => {
+      const k = by(x) || "-";
+      acc[k] = (acc[k] || 0) + 1;
+      return acc;
+    }, {});
+  }
+
+  /* ============================================
+   Add Record Form
+   ============================================ */
+  function initAddRecordForm() {
+    const modal = $("add-record-modal");
+    const form = $("record-form");
+    const alert = $("add-record-alert");
+
+    $("add-record-btn").onclick = () => modal.classList.add("show");
+    $("close-add-record").onclick = closeAddRecordModal;
+    $("cancel-add-record").onclick = closeAddRecordModal;
+
+    function closeAddRecordModal() {
+      modal.classList.remove("show");
+      form.reset();
+      alert.className = "alert";
+    }
+
+    form.onsubmit = (e) => {
+      e.preventDefault();
+      const formData = new FormData(form);
+      const record = {};
+      formData.forEach((val, key) => (record[key] = val));
+
+      showAlert(alert, "กำลังบันทึก...", "");
+      $("submit-record").disabled = true;
+
+      google.script.run
+        .withSuccessHandler(() => {
+          showAlert(alert, "✅ บันทึกสำเร็จ!", "success");
+          $("submit-record").disabled = false;
+          setTimeout(() => {
+            closeAddRecordModal();
+            load();
+          }, 1500);
+        })
+        .withFailureHandler((err) => {
+          showAlert(alert, "❌ เกิดข้อผิดพลาด: " + err.message, "error");
+          $("submit-record").disabled = false;
+        })
+        .addSingleRecord(record);
+    };
+  }
+
+  /* ============================================
+   Import Data
+   ============================================ */
+  function initImportData() {
+    const modal = $("import-modal");
+    const fileInput = $("file-input");
+    const fileLabel = $("file-label");
+    const fileName = $("file-name");
+    const fileSelected = $("file-selected");
+    const uploadBtn = $("upload-btn");
+    const alert = $("import-alert");
+    let selectedFile = null;
+
+    $("import-btn").onclick = () => modal.classList.add("show");
+    $("close-modal").onclick = closeImportModal;
+    $("cancel-btn").onclick = closeImportModal;
+
+    function closeImportModal() {
+      modal.classList.remove("show");
+      fileInput.value = "";
+      fileSelected.classList.remove("show");
+      uploadBtn.disabled = true;
+      alert.className = "alert";
+      selectedFile = null;
+    }
+
+    // Download Template
+    $("download-template").onclick = () => {
+      showAlert(alert, "กำลังสร้าง Template...", "");
+      google.script.run
+        .withSuccessHandler((url) => {
+          showAlert(alert, "✅ สร้าง Template สำเร็จ!", "success");
+          window.open(url, "_blank");
+        })
+        .withFailureHandler((err) => {
+          showAlert(alert, "❌ เกิดข้อผิดพลาด: " + err.message, "error");
+        })
+        .getTemplateUrl();
+    };
+
+    // File Selection
+    fileInput.onchange = (e) => {
+      const file = e.target.files[0];
+      if (file) handleFileSelect(file);
+    };
+
+    // Drag & Drop
+    fileLabel.ondragover = (e) => {
+      e.preventDefault();
+      fileLabel.classList.add("dragover");
+    };
+    fileLabel.ondragleave = () => fileLabel.classList.remove("dragover");
+    fileLabel.ondrop = (e) => {
+      e.preventDefault();
+      fileLabel.classList.remove("dragover");
+      const file = e.dataTransfer.files[0];
+      if (file) handleFileSelect(file);
+    };
+
+    function handleFileSelect(file) {
+      const validTypes = [
+        "text/csv",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      ];
+      if (
+        !validTypes.includes(file.type) &&
+        !file.name.match(/\.(csv|xlsx|xls)$/i)
+      ) {
+        showAlert(alert, "❌ กรุณาเลือกไฟล์ CSV หรือ Excel", "error");
+        return;
+      }
+      selectedFile = file;
+      fileName.textContent = `📄 ${file.name}`;
+      fileSelected.classList.add("show");
+      uploadBtn.disabled = false;
+      alert.className = "alert";
+    }
+
+    // Upload
+    uploadBtn.onclick = () => {
+      if (!selectedFile) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target.result;
+        const csvData = selectedFile.name.match(/\.csv$/i)
+          ? content
+          : parseExcelToCSV(content);
+
+        showAlert(alert, "กำลังอัปโหลด...", "");
+        uploadBtn.disabled = true;
+
+        google.script.run
+          .withSuccessHandler((result) => {
+            showAlert(
+              alert,
+              `✅ นำเข้าสำเร็จ ${result.count} รายการ`,
+              "success"
+            );
+            setTimeout(() => {
+              closeImportModal();
+              load();
+            }, 2000);
+          })
+          .withFailureHandler((err) => {
+            showAlert(alert, "❌ เกิดข้อผิดพลาด: " + err.message, "error");
+            uploadBtn.disabled = false;
+          })
+          .importData(csvData);
+      };
+
+      if (selectedFile.name.match(/\.csv$/i)) {
+        reader.readAsText(selectedFile, "UTF-8");
+      } else {
+        reader.readAsBinaryString(selectedFile);
+      }
+    };
+
+    function parseExcelToCSV(data) {
+      // Simplified Excel to CSV (ในการใช้งานจริงควรใช้ library เช่น SheetJS)
+      return data; // Placeholder
+    }
+  }
+
+  /* ============================================
+   Utility Functions
+   ============================================ */
+  function showAlert(el, msg, type) {
+    el.textContent = msg;
+    el.className = `alert ${type} show`;
+  }
+
+  /* ============================================
+   Application Initialization
+   ============================================ */
+  (function () {
+    initTheme();
+    initAddRecordForm();
+    initImportData();
+    load();
+  })();
+</script>
