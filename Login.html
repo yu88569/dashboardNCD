@@ -277,9 +277,24 @@
           .withSuccessHandler((result) => {
             if (result.success) {
               showAlert("✅ " + result.message, "success");
-              // ใช้ URL ที่ได้จาก result
+              // เก็บ sessionId ใน localStorage (สำหรับ client-side functions)
               setTimeout(() => {
-                window.location.href = result.redirectUrl;
+                if (result.sessionId) {
+                  try {
+                    localStorage.setItem('ncd_session_id', result.sessionId);
+                    console.log("Session ID saved to localStorage:", result.sessionId);
+                  } catch (e) {
+                    console.error("Failed to save session ID:", e);
+                  }
+                }
+                
+                // Redirect ไปหน้า admin (sessionId ถูกเก็บใน UserProperties แล้ว)
+                let redirectUrl = result.redirectUrl;
+                if (redirectUrl && !redirectUrl.includes('?page=admin')) {
+                  redirectUrl += '?page=admin';
+                }
+                console.log("Redirecting to:", redirectUrl);
+                top.window.location.href = redirectUrl;
               }, 500);
             } else {
               showAlert("❌ " + result.message, "error");

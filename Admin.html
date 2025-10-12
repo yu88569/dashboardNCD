@@ -40,11 +40,35 @@
     </header>
 
     <!-- Quick Links -->
-    <div style="padding: var(--pad); border-bottom: 1px solid var(--border-primary);">
-      <a href="#" id="back-to-dashboard" 
-         style="color: var(--border-focus); text-decoration: none; font-size: 14px; font-weight: 500;">
-        ← กลับไปหน้า Dashboard
-      </a>
+    <div style="padding: var(--pad); border-bottom: 1px solid var(--border-primary); display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <a href="#" id="back-to-dashboard" 
+           style="color: var(--border-focus); text-decoration: none; font-size: 14px; font-weight: 500;">
+          ← กลับไปหน้า Dashboard
+        </a>
+        <span style="color: var(--text-secondary); font-size: 14px; margin-left: 20px;">
+          📍 อำเภอ: <span id="amphoe-display" style="font-weight: 600; color: var(--border-focus);"></span>
+        </span>
+      </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loading-indicator" style="display: none; padding: 20px; text-align: center; background: var(--bg-secondary); margin: 20px; border-radius: 8px;">
+      <div style="font-size: 24px; margin-bottom: 10px;">⏳</div>
+      <div style="color: var(--text-secondary);">กำลังโหลดข้อมูล...</div>
+    </div>
+
+    <!-- Data Table Section -->
+    <div class="container">
+      <div class="section">
+        <div class="section-title">
+          📊 ข้อมูลของอำเภอ <span id="amphoe-title"></span>
+          <span style="font-size: 14px; font-weight: normal; color: var(--text-secondary);">
+            (แสดงข้อมูลเฉพาะอำเภอของคุณ)
+          </span>
+        </div>
+        <?!= HtmlService.createHtmlOutputFromFile('Table').getContent(); ?>
+      </div>
     </div>
 
     <!-- Add Record Modal -->
@@ -56,9 +80,17 @@
     <script>
       // ตั้งค่า back link
       document.addEventListener("DOMContentLoaded", function() {
+        const backLink = document.getElementById("back-to-dashboard");
+        
         google.script.run
           .withSuccessHandler((url) => {
-            document.getElementById("back-to-dashboard").href = url;
+            backLink.href = url;
+            backLink.onclick = (e) => {
+              e.preventDefault();
+              if (confirm("คุณต้องการกลับไปหน้า Dashboard หรือไม่?")) {
+                top.window.location.href = url;
+              }
+            };
           })
           .getWebAppUrl();
       });

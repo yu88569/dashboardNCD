@@ -1,6 +1,33 @@
 <script>
   const $ = (id) => document.getElementById(id);
 
+  // SessionId helper (จาก URL หรือ localStorage)
+  function getQueryParam(name) {
+    const m = new RegExp('(^|&)' + name + '=([^&]*)').exec(window.location.search.substring(1));
+    return m ? decodeURIComponent(m[2]) : null;
+  }
+  let sessionId = (function () {
+    // ลองอ่านจาก localStorage ก่อน (จาก Login.html)
+    try { 
+      const sid = localStorage.getItem('ncd_session_id');
+      if (sid) {
+        console.log("Session ID from localStorage:", sid);
+        return sid;
+      }
+    } catch (_) {}
+    
+    // ถ้าไม่มี ลองอ่านจาก URL
+    const sidFromUrl = getQueryParam('sid');
+    if (sidFromUrl) {
+      try { localStorage.setItem('ncd_session_id', sidFromUrl); } catch (_) {}
+      console.log("Session ID from URL:", sidFromUrl);
+      return sidFromUrl;
+    }
+    
+    console.warn("No session ID found");
+    return null;
+  })();
+
   /* ============================================
    Theme Management
    ============================================ */
@@ -31,42 +58,171 @@
   /* ============================================
    Session Management
    ============================================ */
+  let userAmphoe = "";
+  let sessionCheckAttempts = 0;
+  const MAX_SESSION_CHECK_ATTEMPTS = 3;
+
   function checkSession() {
+    sessionCheckAttempts++;
+    console.log("Checking session with sessionId:", sessionId, "attempt:", sessionCheckAttempts);
+    
+    // ถ้าไม่มี sessionId ให้ redirect ทันที
+    if (!sessionId) {
+      console.error("No session ID found");
+      alert("❌ ไม่พบ Session\nกรุณา Login ใหม่");
+      google.script.run
+        .withSuccessHandler((url) => {
+          setTimeout(() => {
+            top.window.location.href = url;
+          }, 1000);
+        })
+        .getWebAppUrl();
+      return;
+    }
+    
+    // Timeout สำหรับการเช็ค session
+    const timeoutId = setTimeout(() => {
+      console.error("Session check timeout");
+      if (sessionCheckAttempts < MAX_SESSION_CHECK_ATTEMPTS) {
+        console.log("Retrying session check...");
+        setTimeout(checkSession, 1000);
+      } else {
+        alert("❌ ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้\nกรุณา refresh หน้าเว็บ (Ctrl+F5)");
+      }
+    }, 10000); // 10 วินาที timeout
+    
     google.script.run
       .withSuccessHandler((result) => {
+        clearTimeout(timeoutId);
+        console.log("Session result:", result);
+        
+        // ตรวจสอบว่า result เป็น null หรือไม่
+        if (!result) {
+          console.error("Result is null, attempt:", sessionCheckAttempts);
+          
+          if (sessionCheckAttempts < MAX_SESSION_CHECK_ATTEMPTS) {
+            console.log("Retrying after 1 second...");
+            setTimeout(checkSession, 1000);
+            return;
+          }
+          
+          // ล้าง session ที่เก่าออก
+          console.log("Clearing session and redirecting...");
+          
+          google.script.run
+            .withSuccessHandler((result) => {
+              // Redirect ไปหน้า dashboard
+              if (result.redirectUrl) {
+                alert("❌ Session หมดอายุหรือไม่ถูกต้อง\nกำลังพาคุณกลับไปหน้า Dashboard\n\nกรุณา Login ใหม่โดยกดปุ่ม 'Admin Login'");
+                setTimeout(() => {
+                  top.window.location.href = result.redirectUrl;
+                }, 2000);
+              }
+            })
+            .withFailureHandler(() => {
+              alert("❌ ไม่สามารถตรวจสอบ session ได้\nกรุณากลับไปหน้า Dashboard และ Login ใหม่\n\nกด OK เพื่อกลับไปหน้า Dashboard");
+              google.script.run
+                .withSuccessHandler((url) => {
+                  setTimeout(() => {
+                    top.window.location.href = url;
+                  }, 1000);
+                })
+                .getWebAppUrl();
+            })
+            .logout(sessionId);
+          return;
+        }
+        
         if (!result.success) {
           // ถ้าไม่มี session ให้ไป login (backend จะ redirect อัตโนมัติ)
-          alert("Session หมดอายุ กรุณา login ใหม่");
-          window.location.reload();
+          console.log("Session check failed:", result.message);
+          alert("Session หมดอายุ กรุณา login ใหม่" + (result.message ? "\n" + result.message : ""));
+          
+          // Redirect ไปหน้า dashboard
+          google.script.run
+            .withSuccessHandler((url) => {
+              top.window.location.href = url;
+            })
+            .getWebAppUrl();
         } else {
           $("username-display").textContent = result.username;
+          userAmphoe = result.amphoe || "";
+          
+          console.log("User amphoe:", userAmphoe);
+          
+          // ตรวจสอบว่ามีอำเภอหรือไม่
+          if (!userAmphoe) {
+            alert("⚠️ ไม่พบข้อมูลอำเภอของ admin นี้\nกรุณาตรวจสอบว่ามีการกำหนดอำเภอในชีท user หรือไม่");
+            $("amphoe-display").textContent = "(ไม่ได้กำหนด)";
+            $("amphoe-display").style.color = "red";
+            $("amphoe-title").textContent = "(ไม่ได้กำหนด)";
+            return;
+          }
+          
+          // แสดงอำเภอในหลายจุด
+          if ($("amphoe-display")) $("amphoe-display").textContent = userAmphoe;
+          if ($("amphoe-title")) $("amphoe-title").textContent = userAmphoe;
+          
+          // เติมค่าอำเภอในฟอร์มเพิ่มรายการ
+          const amphoeInput = $("amphoe-input");
+          if (amphoeInput) {
+            amphoeInput.value = userAmphoe;
+          }
+          
+          // โหลดข้อมูล
+          loadData();
         }
       })
-      .withFailureHandler(() => {
-        alert("เกิดข้อผิดพลาด กรุณา login ใหม่");
-        window.location.reload();
+      .withFailureHandler((err) => {
+        clearTimeout(timeoutId);
+        console.error("Session check failed:", err);
+        
+        if (sessionCheckAttempts < MAX_SESSION_CHECK_ATTEMPTS) {
+          console.log("Retrying after error, attempt:", sessionCheckAttempts);
+          setTimeout(checkSession, 1000);
+          return;
+        }
+        
+        alert("❌ เกิดข้อผิดพลาด: " + err.message + "\n\nกรุณาลองใหม่:\n1. Refresh หน้าเว็บ (Ctrl+F5)\n2. Logout และ Login ใหม่\n3. ตรวจสอบสิทธิ์การเข้าถึง Google Apps Script");
+        
+        // Redirect ไปหน้า dashboard
+        google.script.run
+          .withSuccessHandler((url) => {
+            setTimeout(() => {
+              top.window.location.href = url;
+            }, 2000);
+          })
+          .getWebAppUrl();
       })
-      .checkSession();
+      .checkSession(sessionId);
   }
 
   function initLogout() {
     $("logout-btn").onclick = () => {
       if (confirm("คุณต้องการออกจากระบบหรือไม่?")) {
+        // แสดง loading
+        $("logout-btn").disabled = true;
+        $("logout-btn").innerHTML = '<span>⏳</span><span>กำลังออกจากระบบ...</span>';
+        
         google.script.run
           .withSuccessHandler((result) => {
-            // ออกจากระบบสำเร็จ กลับไปหน้า Dashboard
-            window.location.href = result.redirectUrl;
+            if (result.success) {
+              // แสดงข้อความสำเร็จ
+              alert("✅ " + result.message + "\n\nกำลังกลับไปหน้า Dashboard...");
+              // ใช้ top.window เพื่อ navigate ทั้ง page
+              top.window.location.href = result.redirectUrl;
+            } else {
+              alert("❌ " + result.message);
+              $("logout-btn").disabled = false;
+              $("logout-btn").innerHTML = '<span>🚪</span><span>ออกจากระบบ</span>';
+            }
           })
           .withFailureHandler((err) => {
-            alert("เกิดข้อผิดพลาด: " + err.message);
-            // ลอง redirect อีกครั้ง
-            google.script.run
-              .withSuccessHandler((url) => {
-                window.location.href = url;
-              })
-              .getWebAppUrl();
+            alert("❌ เกิดข้อผิดพลาด: " + err.message);
+            $("logout-btn").disabled = false;
+            $("logout-btn").innerHTML = '<span>🚪</span><span>ออกจากระบบ</span>';
           })
-          .logout();
+          .logout(sessionId);
       }
     };
   }
@@ -79,7 +235,40 @@
     const form = $("record-form");
     const alert = $("add-record-alert");
 
-    $("add-record-btn").onclick = () => modal.classList.add("show");
+    $("add-record-btn").onclick = () => {
+      // Reset เป็นโหมดเพิ่มใหม่
+      form.reset();
+      delete form.dataset.editIndex;
+      delete form.dataset.editMode;
+      
+      // เปิดฟิลด์ชื่อ นามสกุล กลับมา (สำหรับเพิ่มใหม่)
+      const fnameInput = form.querySelector(`[name="ชื่อ"]`);
+      const lnameInput = form.querySelector(`[name="นามสกุล"]`);
+      
+      if (fnameInput) {
+        fnameInput.readOnly = false;
+        fnameInput.style.backgroundColor = "";
+        fnameInput.style.cursor = "";
+      }
+      if (lnameInput) {
+        lnameInput.readOnly = false;
+        lnameInput.style.backgroundColor = "";
+        lnameInput.style.cursor = "";
+      }
+      
+      const submitBtn = form.querySelector('button[type="submit"]');
+      submitBtn.innerHTML = '<span>💾</span><span>บันทึก</span>';
+      submitBtn.style.background = "";
+      
+      // เปลี่ยน header กลับมา
+      const modalHeader = modal.querySelector(".modal-header h2");
+      if (modalHeader) {
+        modalHeader.textContent = "➕ เพิ่มรายการใหม่";
+      }
+      
+      modal.classList.add("show");
+    };
+    
     $("close-add-record").onclick = closeAddRecordModal;
     $("cancel-add-record").onclick = closeAddRecordModal;
 
@@ -87,6 +276,33 @@
       modal.classList.remove("show");
       form.reset();
       alert.className = "alert";
+      delete form.dataset.editIndex;
+      delete form.dataset.editMode;
+      
+      // เปิดฟิลด์ชื่อ นามสกุล กลับมา
+      const fnameInput = form.querySelector(`[name="ชื่อ"]`);
+      const lnameInput = form.querySelector(`[name="นามสกุล"]`);
+      
+      if (fnameInput) {
+        fnameInput.readOnly = false;
+        fnameInput.style.backgroundColor = "";
+        fnameInput.style.cursor = "";
+      }
+      if (lnameInput) {
+        lnameInput.readOnly = false;
+        lnameInput.style.backgroundColor = "";
+        lnameInput.style.cursor = "";
+      }
+      
+      const submitBtn = form.querySelector('button[type="submit"]');
+      submitBtn.innerHTML = '<span>💾</span><span>บันทึก</span>';
+      submitBtn.style.background = "";
+      
+      // เปลี่ยน header กลับมา
+      const modalHeader = modal.querySelector(".modal-header h2");
+      if (modalHeader) {
+        modalHeader.textContent = "➕ เพิ่มรายการใหม่";
+      }
     }
 
     form.onsubmit = (e) => {
@@ -95,27 +311,69 @@
       const record = {};
       formData.forEach((val, key) => (record[key] = val));
 
-      showAlert(alert, "กำลังบันทึก...", "");
+      // เช็คว่าเป็นโหมด Edit หรือ Add
+      const isEditMode = form.dataset.editMode === "true";
+      const editIndex = parseInt(form.dataset.editIndex);
+
+      showAlert(alert, isEditMode ? "กำลังบันทึกการแก้ไข..." : "กำลังบันทึก...", "");
       $("submit-record").disabled = true;
 
-      google.script.run
-        .withSuccessHandler((result) => {
-          if (result.success) {
-            showAlert(alert, "✅ " + result.message, "success");
-            $("submit-record").disabled = false;
-            setTimeout(() => {
-              closeAddRecordModal();
-            }, 1500);
-          } else {
-            showAlert(alert, "❌ " + result.message, "error");
-            $("submit-record").disabled = false;
-          }
-        })
-        .withFailureHandler((err) => {
-          showAlert(alert, "❌ เกิดข้อผิดพลาด: " + err.message, "error");
+      if (isEditMode && !isNaN(editIndex)) {
+        // โหมดแก้ไข - อัปเดตข้อมูล
+        const originalRow = state.filtered[editIndex];
+        const rawIdx = state.raw.findIndex(r => 
+          r[COL.fname] === originalRow[COL.fname] &&
+          r[COL.lname] === originalRow[COL.lname] &&
+          r[COL.phone] === originalRow[COL.phone]
+        );
+
+        if (rawIdx === -1) {
+          showAlert(alert, "❌ ไม่พบข้อมูลในระบบ", "error");
           $("submit-record").disabled = false;
-        })
-        .addSingleRecord(record);
+          return;
+        }
+
+        google.script.run
+          .withSuccessHandler((result) => {
+            if (result.success) {
+              showAlert(alert, "✅ " + result.message, "success");
+              $("submit-record").disabled = false;
+              setTimeout(() => {
+                closeAddRecordModal();
+                loadData(); // รีโหลดข้อมูลใหม่
+              }, 1500);
+            } else {
+              showAlert(alert, "❌ " + result.message, "error");
+              $("submit-record").disabled = false;
+            }
+          })
+          .withFailureHandler((err) => {
+            showAlert(alert, "❌ เกิดข้อผิดพลาด: " + err.message, "error");
+            $("submit-record").disabled = false;
+          })
+          .updateRecord(rawIdx + 2, record, sessionId); // +2 เพราะ header + 0-indexed
+      } else {
+        // โหมดเพิ่มใหม่
+        google.script.run
+          .withSuccessHandler((result) => {
+            if (result.success) {
+              showAlert(alert, "✅ " + result.message, "success");
+              $("submit-record").disabled = false;
+              setTimeout(() => {
+                closeAddRecordModal();
+                loadData(); // รีโหลดข้อมูลใหม่
+              }, 1500);
+            } else {
+              showAlert(alert, "❌ " + result.message, "error");
+              $("submit-record").disabled = false;
+            }
+          })
+          .withFailureHandler((err) => {
+            showAlert(alert, "❌ เกิดข้อผิดพลาด: " + err.message, "error");
+            $("submit-record").disabled = false;
+          })
+          .addSingleRecord(record, sessionId);
+      }
     };
   }
 
@@ -230,13 +488,14 @@
             uploadBtn.disabled = false;
             setTimeout(() => {
               closeImportModal();
+              loadData(); // รีโหลดข้อมูลใหม่
             }, 2000);
           })
           .withFailureHandler((err) => {
             showAlert(alert, "❌ เกิดข้อผิดพลาด: " + err.message, "error");
             uploadBtn.disabled = false;
           })
-          .importData(csvData);
+          .importData(csvData, sessionId);
       };
 
       if (selectedFile.name.match(/\.csv$/i)) {
@@ -253,12 +512,319 @@
   }
 
   /* ============================================
+   Data Management
+   ============================================ */
+  const COL = {
+    fname: "ชื่อ",
+    lname: "นามสกุล",
+    village: "ชื่อหมู่บ้าน",
+    houseNo: "บ้านเลขที่",
+    province: "จังหวัด",
+    amphoe: "อำเภอ",
+    tambon: "ตำบล",
+    phone: "เบอร์โทรศัพท์",
+    ncd: "ภาพรวมของการประเมินโรค NCDs",
+    obesity: "โรคอ้วน",
+    dm: "โรคเบาหวาน",
+    htn: "โรคความดันโลหิต",
+    mental: "สุขภาพจิต",
+    smoking: "สูบบุหรี่",
+    alcohol: "แอลกอฮอล์",
+    status: "สถานะ",
+    referral: "ส่งต่อหน่วยบริการ",
+    referralCode: "รหัสหน่วยบริการที่ส่งออก",
+  };
+
+  let state = {
+    raw: [],
+    filtered: []
+  };
+
+  function loadData() {
+    google.script.run
+      .withSuccessHandler((result) => {
+        console.log("Loaded data:", result);
+        
+        if (result.error) {
+          console.error("Error from server:", result.error);
+          alert("❌ " + result.error);
+          return;
+        }
+        
+        if (result.data && Array.isArray(result.data)) {
+          state.raw = result.data.map((x) => normalize(x));
+          state.filtered = state.raw;
+          console.log("State after normalize:", state);
+          renderTable();
+        } else {
+          console.error("Invalid data format:", result);
+          alert("❌ ข้อมูลไม่ถูกต้อง");
+        }
+      })
+      .withFailureHandler((err) => {
+        console.error("Failed to load data:", err);
+        alert("❌ เกิดข้อผิดพลาดในการโหลดข้อมูล: " + err.message);
+      })
+      .getAdminDataObj(sessionId);
+  }
+
+  function normalize(row) {
+    const t = (x) => (x == null ? "" : String(x).replace(/\s+/g, " ").trim());
+    const out = {};
+    for (const k in row) {
+      const key = t(k);
+      out[key] = row[k];
+    }
+    return out;
+  }
+
+  function renderTable() {
+    const tbody = document.querySelector("#tbl tbody");
+    if (!tbody) {
+      console.error("Table body not found");
+      return;
+    }
+
+    tbody.innerHTML = "";
+
+    console.log("Rendering table with", state.filtered.length, "rows");
+
+    if (state.filtered.length === 0) {
+      const tr = document.createElement("tr");
+      const msg = !userAmphoe 
+        ? "ไม่พบข้อมูลอำเภอ - กรุณาตรวจสอบชีท user" 
+        : `ไม่มีข้อมูลสำหรับอำเภอ "${userAmphoe}"`;
+      tr.innerHTML = `<td colspan="20" style="text-align: center; padding: 2rem; color: var(--text-secondary);">${msg}</td>`;
+      tbody.appendChild(tr);
+      
+      // อัปเดตจำนวนรายการ
+      const totalElement = document.getElementById("total");
+      if (totalElement) {
+        totalElement.textContent = "0";
+      }
+      return;
+    }
+
+    state.filtered.forEach((row, idx) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${idx + 1}</td>
+        <td>${row[COL.fname] || ""}</td>
+        <td>${row[COL.lname] || ""}</td>
+        <td>${row[COL.village] || ""}</td>
+        <td>${row[COL.houseNo] || ""}</td>
+        <td>${row[COL.province] || ""}</td>
+        <td>${row[COL.amphoe] || ""}</td>
+        <td>${row[COL.tambon] || ""}</td>
+        <td>${row[COL.phone] || ""}</td>
+        <td>${row[COL.ncd] || ""}</td>
+        <td>${row[COL.obesity] || ""}</td>
+        <td>${row[COL.dm] || ""}</td>
+        <td>${row[COL.htn] || ""}</td>
+        <td>${row[COL.mental] || ""}</td>
+        <td>${row[COL.smoking] || ""}</td>
+        <td>${row[COL.alcohol] || ""}</td>
+        <td>${row[COL.status] || ""}</td>
+        <td>${row[COL.referral] || ""}</td>
+        <td>${row[COL.referralCode] || ""}</td>
+        <td style="white-space: nowrap;">
+          <button class="btn-edit" data-index="${idx}" title="แก้ไข" style="padding: 4px 8px; margin-right: 4px; background: var(--border-focus); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+            ✏️
+          </button>
+          <button class="btn-delete" data-index="${idx}" title="ลบ" style="padding: 4px 8px; background: #e53e3e; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+            🗑️
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // อัปเดตจำนวนรายการ
+    const totalElement = document.getElementById("total");
+    if (totalElement) {
+      totalElement.textContent = state.filtered.length;
+    }
+  }
+
+  /* ============================================
    Utility Functions
    ============================================ */
   function showAlert(el, msg, type) {
     el.textContent = msg;
     el.className = `alert ${type} show`;
   }
+
+  /* ============================================
+   CRUD Operations - Edit & Delete
+   ============================================ */
+  function initCRUD() {
+    // ใช้ event delegation สำหรับปุ่ม Edit และ Delete
+    const tbody = document.querySelector("#tbl tbody");
+    if (!tbody) return;
+
+    tbody.addEventListener("click", (e) => {
+      const target = e.target;
+      
+      // ปุ่มแก้ไข
+      if (target.classList.contains("btn-edit") || target.closest(".btn-edit")) {
+        const btn = target.classList.contains("btn-edit") ? target : target.closest(".btn-edit");
+        const idx = parseInt(btn.dataset.index);
+        editRecord(idx);
+      }
+      
+      // ปุ่มลบ
+      if (target.classList.contains("btn-delete") || target.closest(".btn-delete")) {
+        const btn = target.classList.contains("btn-delete") ? target : target.closest(".btn-delete");
+        const idx = parseInt(btn.dataset.index);
+        deleteRecord(idx);
+      }
+    });
+  }
+
+  function editRecord(idx) {
+    const row = state.filtered[idx];
+    if (!row) {
+      alert("❌ ไม่พบข้อมูล");
+      return;
+    }
+
+    console.log("Editing record:", row);
+
+    // เปิด modal ก่อน
+    $("add-record-modal").classList.add("show");
+
+    // เติมข้อมูลในฟอร์มโดยใช้ name attribute
+    const form = $("record-form");
+    
+    // ฟังก์ชันช่วยเซตค่า โดยหา input จาก name
+    const setValue = (name, value) => {
+      const input = form.querySelector(`[name="${name}"]`);
+      if (input) {
+        input.value = value || "";
+      }
+    };
+
+    // เติมข้อมูลทุกฟิลด์ตาม COL
+    setValue(COL.fname, row[COL.fname]);
+    setValue(COL.lname, row[COL.lname]);
+    setValue(COL.village, row[COL.village]);
+    setValue(COL.houseNo, row[COL.houseNo]);
+    setValue(COL.province, row[COL.province]);
+    setValue(COL.amphoe, row[COL.amphoe]);
+    setValue(COL.tambon, row[COL.tambon]);
+    setValue(COL.phone, row[COL.phone]);
+    setValue(COL.ncd, row[COL.ncd]);
+    setValue(COL.obesity, row[COL.obesity]);
+    setValue(COL.dm, row[COL.dm]);
+    setValue(COL.htn, row[COL.htn]);
+    setValue(COL.mental, row[COL.mental]);
+    setValue(COL.smoking, row[COL.smoking]);
+    setValue(COL.alcohol, row[COL.alcohol]);
+    setValue(COL.status, row[COL.status]);
+    setValue(COL.referral, row[COL.referral]);
+    setValue(COL.referralCode, row[COL.referralCode]);
+
+    // ปิดการแก้ไข: ชื่อ, นามสกุล, อำเภอ
+    const fnameInput = form.querySelector(`[name="${COL.fname}"]`);
+    const lnameInput = form.querySelector(`[name="${COL.lname}"]`);
+    const amphoeInput = form.querySelector(`[name="${COL.amphoe}"]`);
+    
+    if (fnameInput) {
+      fnameInput.readOnly = true;
+      fnameInput.style.backgroundColor = "var(--bg-secondary)";
+      fnameInput.style.cursor = "not-allowed";
+    }
+    if (lnameInput) {
+      lnameInput.readOnly = true;
+      lnameInput.style.backgroundColor = "var(--bg-secondary)";
+      lnameInput.style.cursor = "not-allowed";
+    }
+    if (amphoeInput) {
+      amphoeInput.readOnly = true;
+      amphoeInput.style.backgroundColor = "var(--bg-secondary)";
+      amphoeInput.style.cursor = "not-allowed";
+    }
+
+    // เปลี่ยนปุ่มเป็น "บันทึกการแก้ไข"
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.innerHTML = '<span>💾</span><span>บันทึกการแก้ไข</span>';
+    submitBtn.style.background = "#f59e0b";
+
+    // เปลี่ยน header
+    const modalHeader = $("add-record-modal").querySelector(".modal-header h2");
+    if (modalHeader) {
+      modalHeader.textContent = "✏️ แก้ไขข้อมูล";
+    }
+
+    // เก็บ index ไว้ในฟอร์ม
+    form.dataset.editIndex = idx;
+    form.dataset.editMode = "true";
+  }
+
+  function deleteRecord(idx) {
+    const row = state.filtered[idx];
+    if (!row) {
+      alert("❌ ไม่พบข้อมูล");
+      return;
+    }
+
+    const name = `${row[COL.fname] || ""} ${row[COL.lname] || ""}`.trim();
+    
+    if (!confirm(`คุณต้องการลบข้อมูลของ "${name}" หรือไม่?\n\n⚠️ การลบจะไม่สามารถย้อนกลับได้`)) {
+      return;
+    }
+
+    console.log("Deleting record:", row);
+
+    // หา row index ใน raw data
+    const rawIdx = state.raw.findIndex(r => 
+      r[COL.fname] === row[COL.fname] &&
+      r[COL.lname] === row[COL.lname] &&
+      r[COL.phone] === row[COL.phone]
+    );
+
+    if (rawIdx === -1) {
+      alert("❌ ไม่พบข้อมูลในระบบ");
+      return;
+    }
+
+    // แสดง loading
+    const loadingIndicator = $("loading-indicator");
+    if (loadingIndicator) {
+      loadingIndicator.style.display = "block";
+    }
+
+    // เรียก API ลบข้อมูล
+    const sessionId = localStorage.getItem('ncd_session_id');
+    google.script.run
+      .withSuccessHandler((result) => {
+        if (loadingIndicator) {
+          loadingIndicator.style.display = "none";
+        }
+
+        if (result.success) {
+          alert("✅ " + result.message);
+          // ลบออกจาก state
+          state.raw.splice(rawIdx, 1);
+          applyFilters();
+        } else {
+          alert("❌ " + result.message);
+        }
+      })
+      .withFailureHandler((err) => {
+        if (loadingIndicator) {
+          loadingIndicator.style.display = "none";
+        }
+        console.error("Delete failed:", err);
+        alert("❌ เกิดข้อผิดพลาด: " + err.message);
+      })
+      .deleteRecord(rawIdx + 2, sessionId); // +2 เพราะ header + 0-indexed
+  }
+
+  /* ============================================
+   Debug Functions (Removed - Not Used)
+   ============================================ */
+  // Debug functions removed as per user request
 
   /* ============================================
    Application Initialization
@@ -269,5 +835,6 @@
     initLogout();
     initAddRecordForm();
     initImportData();
+    initCRUD();
   })();
 </script>

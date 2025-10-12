@@ -1,14 +1,69 @@
 <div class="charts-section">
   <div class="chart-card">
-    <div class="chart-title">📊 ภาพรวม NCDs</div>
-    <div id="chart-ncd" class="chart-container"></div>
-  </div>
-  <div class="chart-card">
-    <div class="chart-title">🔍 ปัจจัยเสี่ยง</div>
+    <div class="chart-title"> ปัจจัยเสี่ยง</div>
     <div id="chart-factors" class="chart-container"></div>
   </div>
   <div class="chart-card">
     <div class="chart-title">🏘️ Top 10 ตำบล</div>
     <div id="chart-tambon" class="chart-container"></div>
+  </div>
+</div>
+
+<!-- สถานะป่วยและเสี่ยง -->
+<div style="padding: var(--pad); display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: var(--gap);">
+  <!-- จำนวนสถานะป่วยของผู้ประเมิน -->
+  <div class="chart-card">
+    <div class="chart-title">🏥 จำนวนสถานะป่วยของผู้ประเมิน</div>
+    <div id="chart-sick-status" class="chart-container" style="height: 280px;"></div>
+  </div>
+  
+  <!-- จำนวนสถานะเสี่ยงของผู้ประเมิน -->
+  <div class="chart-card">
+    <div class="chart-title">⚠️ จำนวนสถานะเสี่ยงของผู้ประเมิน</div>
+    <div id="chart-risk-status" class="chart-container" style="height: 280px;"></div>
+  </div>
+</div>
+
+<!-- ข้อมูลตามประเภท -->
+<div style="padding: var(--pad);">
+  <div class="chart-card">
+    <div class="chart-title">📋 ข้อมูลตามประเภท</div>
+    <div style="padding: 20px;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr style="background: var(--bg-tertiary); border-bottom: 1px solid var(--border-secondary);">
+            <th style="padding: 12px; text-align: left; font-size: 13px; color: var(--text-secondary); font-weight: 600;">ประเมิน</th>
+            <th style="padding: 12px; text-align: right; font-size: 13px; color: var(--text-secondary); font-weight: 600;">ปกติ(คน)</th>
+            <th style="padding: 12px; text-align: right; font-size: 13px; color: var(--text-secondary); font-weight: 600;">เสี่ยง(คน)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid var(--border-primary);">
+            <td style="padding: 12px; font-size: 14px; color: var(--text-primary);">
+              <span style="font-size: 18px; margin-right: 8px;">🚬</span>
+              การสูบบุหรี่
+            </td>
+            <td style="padding: 12px; text-align: right; font-size: 14px;" id="smoke-normal">0</td>
+            <td style="padding: 12px; text-align: right; font-size: 14px;" id="smoke-risk">0</td>
+          </tr>
+          <tr style="border-bottom: 1px solid var(--border-primary);">
+            <td style="padding: 12px; font-size: 14px; color: var(--text-primary);">
+              <span style="font-size: 18px; margin-right: 8px;">🍺</span>
+              การดื่มเครื่องดื่มแอลกอฮอล์
+            </td>
+            <td style="padding: 12px; text-align: right; font-size: 14px;" id="alcohol-normal">0</td>
+            <td style="padding: 12px; text-align: right; font-size: 14px;" id="alcohol-risk">0</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px; font-size: 14px; color: var(--text-primary);">
+              <span style="font-size: 18px; margin-right: 8px;">🧠</span>
+              สุขภาพจิต
+            </td>
+            <td style="padding: 12px; text-align: right; font-size: 14px;" id="mental-normal">0</td>
+            <td style="padding: 12px; text-align: right; font-size: 14px;" id="mental-risk">0</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>

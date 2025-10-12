@@ -1,5 +1,9 @@
+/**
+ * @OnlyCurrentDoc
+ */
+
 /** ====== CONFIG ====== **/
-const SHEET_ID = "1e7US3de5RqD75fsx-i6kLdebYHrClSC0lNZQmfYUEQk";
+const SHEET_ID = "1m9zEncxi11CUx2PsNYVgVFd_3T6Vwu8qLbzCfn5X3cY";
 const SHEET_NAME = "ncd_db_central";
 const USER_SHEET_NAME = "user";
 const CACHE_TTL_SECONDS = 300;
@@ -34,33 +38,127 @@ function maskName(name) {
 
 /** ====== ENTRYPOINT ====== **/
 function doGet(e) {
-  const page = e.parameter.page;
-  
-  // ถ้าเรียก admin panel ต้องเช็ค session
-  if (page === "admin") {
-    const session = getSession();
-    if (!session) {
+  try {
+    const page = e && e.parameter ? e.parameter.page : null;
+    
+    // ถ้าเรียก admin panel ต้องเช็ค session
+    if (page === "admin") {
+      // อ่าน sessionId จาก UserProperties แล้วดึง session จริงจาก ScriptProperties
+      const session = getSession();
+      Logger.log("doGet admin check - Session: " + (session ? "exists" : "null"));
+      
+      if (!session) {
+        Logger.log("No session, showing session expired page");
+        return HtmlService.createTemplateFromFile("SessionExpired")
+          .evaluate()
+          .setTitle("Session Expired - NCDs Dashboard")
+          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+      }
+      
+      Logger.log("Session found for user: " + session.username + ", amphoe: " + session.amphoe);
+      return HtmlService.createTemplateFromFile("Admin")
+        .evaluate()
+        .setTitle("Admin Panel - NCDs Dashboard")
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+    
+    // หน้า login
+    if (page === "login") {
       return HtmlService.createTemplateFromFile("Login")
         .evaluate()
         .setTitle("Login - NCDs Dashboard")
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
-    return HtmlService.createTemplateFromFile("Admin")
+    
+    // หน้า dashboard ปกติ
+    return HtmlService.createTemplateFromFile("index")
       .evaluate()
-      .setTitle("Admin Panel - NCDs Dashboard")
+      .setTitle("NCDs Dashboard")
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } catch (error) {
+    Logger.log("Error in doGet: " + error.toString());
+    // ถ้าเกิด error ให้ไปหน้า session expired
+    return HtmlService.createTemplateFromFile("SessionExpired")
+      .evaluate()
+      .setTitle("Session Expired - NCDs Dashboard")
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }
-  
-  // หน้า dashboard ปกติ
-  return HtmlService.createTemplateFromFile("index")
-    .evaluate()
-    .setTitle("NCDs Dashboard")
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 /** ====== GET WEB APP URL ====== **/
 function getWebAppUrl() {
   return ScriptApp.getService().getUrl();
+}
+
+/** ====== DEBUG: TEST SESSION ====== **/
+function testSession() {
+  const session = getSession();
+  Logger.log("=== TEST SESSION ===");
+  Logger.log("Session: " + JSON.stringify(session));
+  
+  if (session) {
+    Logger.log("Username: " + session.username);
+    Logger.log("Amphoe: " + session.amphoe);
+    Logger.log("LoginTime: " + session.loginTime);
+  } else {
+    Logger.log("No session found");
+  }
+  
+  const checkResult = checkSession();
+  Logger.log("CheckSession result: " + JSON.stringify(checkResult));
+  
+  return checkResult;
+}
+
+/** ====== DEBUG: TEST USER SHEET ====== **/
+function testUserSheet() {
+  try {
+    const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(USER_SHEET_NAME);
+    if (!sh) {
+      return { success: false, message: "ไม่พบชีท user" };
+    }
+    
+    const data = sh.getDataRange().getValues();
+    const [headers, ...rows] = data;
+    
+    Logger.log("=== USER SHEET ===");
+    Logger.log("Headers: " + JSON.stringify(headers));
+    Logger.log("Total users: " + rows.length);
+    
+    // หา index ของคอลัมน์อำเภอ
+    const amphoeIdx = headers.findIndex(h => String(h).trim() === "อำเภอ");
+    Logger.log("Amphoe column index: " + amphoeIdx);
+    
+    // แสดงข้อมูล user 3 คนแรก
+    rows.slice(0, 3).forEach((row, i) => {
+      Logger.log("User " + (i+1) + ": " + JSON.stringify({
+        username: row[0],
+        amphoe: amphoeIdx !== -1 ? row[amphoeIdx] : "N/A"
+      }));
+    });
+    
+    return {
+      success: true,
+      headers: headers,
+      totalUsers: rows.length,
+      amphoeColumnIndex: amphoeIdx
+    };
+  } catch (error) {
+    Logger.log("Error: " + error.toString());
+    return { success: false, message: error.toString() };
+  }
+}
+
+/** ====== FORCE AUTHORIZATION ====== **/
+function forceAuthorization() {
+  // ฟังก์ชันนี้จะบังคับให้ user authorize สิทธิ์
+  try {
+    PropertiesService.getUserProperties().getProperty("test");
+    SpreadsheetApp.openById(SHEET_ID);
+    return { success: true, message: "Authorization successful" };
+  } catch (error) {
+    return { success: false, message: error.toString() };
+  }
 }
 
 /** ====== AUTHENTICATION ====== **/
@@ -79,6 +177,7 @@ function login(username, password) {
     const [headers, ...rows] = data;
     const userIdx = headers.findIndex(h => String(h).trim().toLowerCase() === "username");
     const passIdx = headers.findIndex(h => String(h).trim().toLowerCase() === "password");
+    const amphoeIdx = headers.findIndex(h => String(h).trim() === "อำเภอ");
     
     if (userIdx === -1 || passIdx === -1) {
       return { success: false, message: "โครงสร้างตารางไม่ถูกต้อง" };
@@ -90,18 +189,32 @@ function login(username, password) {
     );
     
     if (user) {
-      // เก็บ session (ใช้ Properties Service)
+      // สร้าง session และเก็บใน ScriptProperties โดยอ้างอิงจาก sessionId
       const sessionId = Utilities.getUuid();
+      const amphoe = amphoeIdx !== -1 ? String(user[amphoeIdx]).trim() : "";
+
+      Logger.log("Login successful - Username: " + username + ", Amphoe: " + amphoe + ", AmphoeIdx: " + amphoeIdx);
+
+      const now = new Date().getTime();
+      const sessionObj = {
+        sessionId: sessionId,
+        username: username,
+        amphoe: amphoe,
+        loginTime: now
+      };
+      putSession_(sessionObj);
+      
+      // เก็บ sessionId ใน UserProperties เพื่อให้ doGet อ่านได้
       const userProperties = PropertiesService.getUserProperties();
       userProperties.setProperty("sessionId", sessionId);
-      userProperties.setProperty("username", username);
-      userProperties.setProperty("loginTime", new Date().getTime().toString());
-      
-      return { 
-        success: true, 
+      Logger.log("Saved sessionId to UserProperties: " + sessionId);
+
+      return {
+        success: true,
         message: "เข้าสู่ระบบสำเร็จ",
         sessionId: sessionId,
         username: username,
+        amphoe: amphoe,
         redirectUrl: ScriptApp.getService().getUrl() + "?page=admin"
       };
     } else {
@@ -112,12 +225,16 @@ function login(username, password) {
   }
 }
 
-function logout() {
+function logout(sessionId) {
   try {
+    // ลบ session จาก ScriptProperties ตาม sessionId (ถ้ามี)
+    if (sessionId) {
+      clearSessionById_(sessionId);
+    }
+    // ลบ sessionId จาก UserProperties ด้วย
     const userProperties = PropertiesService.getUserProperties();
     userProperties.deleteProperty("sessionId");
-    userProperties.deleteProperty("username");
-    userProperties.deleteProperty("loginTime");
+    
     return { 
       success: true, 
       message: "ออกจากระบบสำเร็จ",
@@ -136,43 +253,70 @@ function getSession() {
   try {
     const userProperties = PropertiesService.getUserProperties();
     const sessionId = userProperties.getProperty("sessionId");
-    const username = userProperties.getProperty("username");
-    const loginTime = userProperties.getProperty("loginTime");
     
-    if (!sessionId || !username) {
+    Logger.log("Getting session from UserProperties - SessionId: " + sessionId);
+    
+    if (!sessionId) {
+      Logger.log("No sessionId found in UserProperties");
       return null;
     }
+    
+    // ใช้ sessionId ไปดึงข้อมูล session จริงจาก ScriptProperties
+    const session = getSessionById_(sessionId);
+    if (!session) {
+      Logger.log("Session not found in ScriptProperties");
+      return null;
+    }
+    
+    Logger.log("Session found - Username: " + session.username + ", Amphoe: " + session.amphoe);
     
     // ตรวจสอบว่า session หมดอายุหรือไม่ (24 ชั่วโมง)
-    const now = new Date().getTime();
-    const login = parseInt(loginTime);
-    const hoursPassed = (now - login) / (1000 * 60 * 60);
-    
-    if (hoursPassed > 24) {
-      logout();
-      return null;
+    if (session.loginTime) {
+      const now = new Date().getTime();
+      const login = parseInt(session.loginTime);
+      
+      if (!isNaN(login)) {
+        const hoursPassed = (now - login) / (1000 * 60 * 60);
+        
+        if (hoursPassed > 24) {
+          Logger.log("Session expired");
+          clearSessionById_(sessionId);
+          userProperties.deleteProperty("sessionId");
+          return null;
+        }
+      }
     }
     
-    return {
-      sessionId: sessionId,
-      username: username,
-      loginTime: new Date(login)
-    };
+    return session;
   } catch (error) {
+    Logger.log("Error in getSession: " + error.toString());
     return null;
   }
 }
 
-function checkSession() {
-  const session = getSession();
-  if (session) {
+function checkSession(sessionId) {
+  try {
+    // รองรับตรวจสอบด้วย sessionId ที่รับมาจาก client
+    const session = sessionId ? getSessionById_(sessionId) : getSession();
+    if (session) {
+      return { 
+        success: true, 
+        username: session.username || "",
+        amphoe: session.amphoe || "",
+        loginTime: session.loginTime
+      };
+    }
     return { 
-      success: true, 
-      username: session.username,
-      loginTime: session.loginTime
+      success: false,
+      message: "ไม่พบ session"
+    };
+  } catch (error) {
+    Logger.log("Error in checkSession: " + error.toString());
+    return { 
+      success: false,
+      message: "เกิดข้อผิดพลาด: " + error.toString()
     };
   }
-  return { success: false };
 }
 
 /** ====== SERVER: RETURN DATA OBJECT ====== **/
@@ -194,6 +338,61 @@ function getDataObj() {
     cache.put("rows", json, CACHE_TTL_SECONDS);
   }
   return JSON.parse(json); // ส่งเป็น object ให้ client ตรงๆ
+}
+
+/** ====== SERVER: RETURN DATA FOR ADMIN (FILTERED BY AMPHOE) ====== **/
+function getAdminDataObj(sessionId) {
+  try {
+    const session = sessionId ? getSessionById_(sessionId) : getSession();
+    if (!session) {
+      Logger.log("No session found");
+      return { data: [], updatedAt: new Date(), error: "ไม่ได้ล็อกอิน" };
+    }
+    
+    const amphoe = session.amphoe;
+    if (!amphoe) {
+      Logger.log("No amphoe in session");
+      return { data: [], updatedAt: new Date(), error: "ไม่ได้กำหนดอำเภอ" };
+    }
+    
+    Logger.log("Loading data for amphoe: " + amphoe);
+    
+    const cache = CacheService.getScriptCache();
+    const cacheKey = "admin_rows_" + amphoe;
+    let json = cache.get(cacheKey);
+    
+    if (!json) {
+      const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
+      const values = sh.getDataRange().getValues();
+      const trim = (x) => (x == null ? "" : String(x).trim());
+      let data = [];
+      
+      if (values && values.length > 1) {
+        const [header, ...rows] = values;
+        const amphoeIdx = header.findIndex(h => trim(h) === "อำเภอ");
+        
+        Logger.log("Amphoe column index: " + amphoeIdx);
+        Logger.log("Total rows: " + rows.length);
+        
+        data = rows
+          .filter((r) => r.some((v) => String(v).trim() !== "")) // ข้ามแถวว่าง
+          .filter((r) => amphoeIdx !== -1 && trim(r[amphoeIdx]) === amphoe) // กรองเฉพาะอำเภอของ admin
+          .map((r) => Object.fromEntries(header.map((h, i) => [trim(h), r[i]])));
+        
+        Logger.log("Filtered data count: " + data.length);
+      }
+      
+      json = JSON.stringify({ data, updatedAt: new Date(), amphoe: amphoe });
+      cache.put(cacheKey, json, CACHE_TTL_SECONDS);
+    }
+    
+    const result = JSON.parse(json);
+    Logger.log("Returning data with " + result.data.length + " rows");
+    return result;
+  } catch (error) {
+    Logger.log("Error in getAdminDataObj: " + error.toString());
+    return { data: [], updatedAt: new Date(), error: error.toString() };
+  }
 }
 
 /** ====== GET TEMPLATE HEADERS ====== **/
@@ -235,8 +434,19 @@ function createUniqueKey(row, headers) {
 }
 
 /** ====== IMPORT DATA FROM CSV/EXCEL (WITH UPDATE SUPPORT) ====== **/
-function importData(csvData) {
+function importData(csvData, sessionId) {
   try {
+    // เช็ค session และดึงอำเภอของ admin
+    const session = sessionId ? getSessionById_(sessionId) : getSession();
+    if (!session) {
+      return { success: false, message: "ไม่ได้ล็อกอิน" };
+    }
+    
+    const adminAmphoe = session.amphoe;
+    if (!adminAmphoe) {
+      return { success: false, message: "ไม่ได้กำหนดอำเภอสำหรับ admin นี้" };
+    }
+    
     const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
     const existingHeaders = sh
       .getRange(1, 1, 1, sh.getLastColumn())
@@ -265,6 +475,9 @@ function importData(csvData) {
     }
 
     const [headers, ...dataRows] = rows;
+    
+    // หา index ของคอลัมน์อำเภอ
+    const amphoeIdx = existingHeaders.findIndex(h => String(h).trim() === "อำเภอ");
 
     // ตรวจสอบว่า headers ตรงกันหรือไม่
     const headerMatch = headers.every(
@@ -313,6 +526,11 @@ function importData(csvData) {
       if (lnameIdx !== -1 && maskedRow[lnameIdx]) {
         maskedRow[lnameIdx] = maskName(String(maskedRow[lnameIdx]));
       }
+      
+      // เซตอำเภอตาม admin
+      if (amphoeIdx !== -1) {
+        maskedRow[amphoeIdx] = adminAmphoe;
+      }
 
       // สร้าง key จากข้อมูลที่ปกปิดแล้ว
       const key = createUniqueKey(maskedRow, existingHeaders);
@@ -340,15 +558,18 @@ function importData(csvData) {
       );
     }
 
-    // ล้าง cache
-    CacheService.getScriptCache().remove("rows");
+    // ล้าง cache ทั้งหมด
+    const cache = CacheService.getScriptCache();
+    cache.remove("rows");
+    cache.remove("admin_rows_" + adminAmphoe);
 
     return {
       success: true,
-      message: `นำเข้าสำเร็จ - เพิ่มใหม่ ${addCount} รายการ, อัปเดต ${updateCount} รายการ`,
+      message: `นำเข้าสำเร็จ - เพิ่มใหม่ ${addCount} รายการ, อัปเดต ${updateCount} รายการ (อำเภอ: ${adminAmphoe})`,
       count: dataRows.length,
       added: addCount,
       updated: updateCount,
+      amphoe: adminAmphoe,
     };
   } catch (error) {
     return {
@@ -359,8 +580,19 @@ function importData(csvData) {
 }
 
 /** ====== ADD/UPDATE SINGLE RECORD ====== **/
-function addSingleRecord(recordData) {
+function addSingleRecord(recordData, sessionId) {
   try {
+    // เช็ค session และดึงอำเภอของ admin
+    const session = sessionId ? getSessionById_(sessionId) : getSession();
+    if (!session) {
+      return { success: false, message: "ไม่ได้ล็อกอิน" };
+    }
+    
+    const adminAmphoe = session.amphoe;
+    if (!adminAmphoe) {
+      return { success: false, message: "ไม่ได้กำหนดอำเภอสำหรับ admin นี้" };
+    }
+    
     const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
     const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
 
@@ -372,6 +604,11 @@ function addSingleRecord(recordData) {
       // ปกปิดชื่อและนามสกุล
       if (key === "ชื่อ" || key === "นามสกุล") {
         value = maskName(String(value));
+      }
+      
+      // เซตอำเภอตาม admin
+      if (key === "อำเภอ") {
+        value = adminAmphoe;
       }
 
       return value;
@@ -402,13 +639,16 @@ function addSingleRecord(recordData) {
       sh.getRange(foundRow, 1, 1, rowData.length).setValues([rowData]);
 
       // ล้าง cache
-      CacheService.getScriptCache().remove("rows");
+      const cache = CacheService.getScriptCache();
+      cache.remove("rows");
+      cache.remove("admin_rows_" + adminAmphoe);
 
       return {
         success: true,
-        message: "อัปเดตข้อมูลสำเร็จ",
+        message: "อัปเดตข้อมูลสำเร็จ (อำเภอ: " + adminAmphoe + ")",
         action: "update",
         row: foundRow,
+        amphoe: adminAmphoe,
       };
     } else {
       // เพิ่มแถวใหม่
@@ -416,15 +656,141 @@ function addSingleRecord(recordData) {
       sh.getRange(newRow, 1, 1, rowData.length).setValues([rowData]);
 
       // ล้าง cache
-      CacheService.getScriptCache().remove("rows");
+      const cache = CacheService.getScriptCache();
+      cache.remove("rows");
+      cache.remove("admin_rows_" + adminAmphoe);
 
       return {
         success: true,
-        message: "เพิ่มข้อมูลใหม่สำเร็จ",
+        message: "เพิ่มข้อมูลใหม่สำเร็จ (อำเภอ: " + adminAmphoe + ")",
         action: "add",
         row: newRow,
+        amphoe: adminAmphoe,
       };
     }
+  } catch (error) {
+    return {
+      success: false,
+      message: "เกิดข้อผิดพลาด: " + error.toString(),
+    };
+  }
+}
+
+/** ====== UPDATE RECORD (BY ROW INDEX) ====== **/
+function updateRecord(rowIndex, recordData, sessionId) {
+  try {
+    // เช็ค session และดึงอำเภอของ admin
+    const session = sessionId ? getSessionById_(sessionId) : getSession();
+    if (!session) {
+      return { success: false, message: "ไม่ได้ล็อกอิน" };
+    }
+    
+    const adminAmphoe = session.amphoe;
+    if (!adminAmphoe) {
+      return { success: false, message: "ไม่ได้กำหนดอำเภอสำหรับ admin นี้" };
+    }
+    
+    const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
+    const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+    
+    // ตรวจสอบว่า rowIndex อยู่ในช่วงที่ถูกต้อง
+    if (rowIndex < 2 || rowIndex > sh.getLastRow()) {
+      return { success: false, message: "ตำแหน่งข้อมูลไม่ถูกต้อง" };
+    }
+    
+    // ตรวจสอบว่าแถวนี้เป็นของอำเภอเดียวกันหรือไม่
+    const amphoeCol = headers.findIndex(h => String(h).trim() === "อำเภอ");
+    if (amphoeCol !== -1) {
+      const currentAmphoe = sh.getRange(rowIndex, amphoeCol + 1).getValue();
+      if (String(currentAmphoe).trim() !== adminAmphoe) {
+        return { success: false, message: "ไม่สามารถแก้ไขข้อมูลของอำเภออื่นได้" };
+      }
+    }
+
+    // สร้าง array ของข้อมูลตามลำดับ headers
+    const rowData = headers.map((header) => {
+      const key = String(header).trim();
+      let value = recordData[key] || "";
+
+      // ปกปิดชื่อและนามสกุล
+      if (key === "ชื่อ" || key === "นามสกุล") {
+        value = maskName(String(value));
+      }
+      
+      // บังคับอำเภอตาม admin (ป้องกันการแก้ไขอำเภอ)
+      if (key === "อำเภอ") {
+        value = adminAmphoe;
+      }
+
+      return value;
+    });
+
+    // อัปเดตข้อมูล
+    sh.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
+
+    // ล้าง cache
+    const cache = CacheService.getScriptCache();
+    cache.remove("rows");
+    cache.remove("admin_rows_" + adminAmphoe);
+
+    return {
+      success: true,
+      message: "แก้ไขข้อมูลสำเร็จ",
+      row: rowIndex,
+      amphoe: adminAmphoe,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: "เกิดข้อผิดพลาด: " + error.toString(),
+    };
+  }
+}
+
+/** ====== DELETE RECORD (BY ROW INDEX) ====== **/
+function deleteRecord(rowIndex, sessionId) {
+  try {
+    // เช็ค session และดึงอำเภอของ admin
+    const session = sessionId ? getSessionById_(sessionId) : getSession();
+    if (!session) {
+      return { success: false, message: "ไม่ได้ล็อกอิน" };
+    }
+    
+    const adminAmphoe = session.amphoe;
+    if (!adminAmphoe) {
+      return { success: false, message: "ไม่ได้กำหนดอำเภอสำหรับ admin นี้" };
+    }
+    
+    const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
+    const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+    
+    // ตรวจสอบว่า rowIndex อยู่ในช่วงที่ถูกต้อง
+    if (rowIndex < 2 || rowIndex > sh.getLastRow()) {
+      return { success: false, message: "ตำแหน่งข้อมูลไม่ถูกต้อง" };
+    }
+    
+    // ตรวจสอบว่าแถวนี้เป็นของอำเภอเดียวกันหรือไม่
+    const amphoeCol = headers.findIndex(h => String(h).trim() === "อำเภอ");
+    if (amphoeCol !== -1) {
+      const currentAmphoe = sh.getRange(rowIndex, amphoeCol + 1).getValue();
+      if (String(currentAmphoe).trim() !== adminAmphoe) {
+        return { success: false, message: "ไม่สามารถลบข้อมูลของอำเภออื่นได้" };
+      }
+    }
+    
+    // ลบแถว
+    sh.deleteRow(rowIndex);
+
+    // ล้าง cache
+    const cache = CacheService.getScriptCache();
+    cache.remove("rows");
+    cache.remove("admin_rows_" + adminAmphoe);
+
+    return {
+      success: true,
+      message: "ลบข้อมูลสำเร็จ",
+      amphoe: adminAmphoe,
+    };
   } catch (error) {
     return {
       success: false,
@@ -522,5 +888,50 @@ function getTemplateUrl() {
       success: false,
       message: "เกิดข้อผิดพลาดในการสร้าง template: " + error.toString(),
     };
+  }
+}
+
+/** ====== SESSION STORE (SCRIPT PROPERTIES) ====== **/
+function putSession_(sessionObj) {
+  try {
+    const sp = PropertiesService.getScriptProperties();
+    const key = "session:" + sessionObj.sessionId;
+    sp.setProperty(key, JSON.stringify(sessionObj));
+  } catch (e) {
+    Logger.log("putSession_ error: " + e.toString());
+  }
+}
+
+function getSessionById_(sessionId) {
+  try {
+    if (!sessionId) return null;
+    const sp = PropertiesService.getScriptProperties();
+    const raw = sp.getProperty("session:" + sessionId);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    // หมดอายุ 24 ชั่วโมงเหมือนเดิม
+    const now = new Date().getTime();
+    const login = parseInt(s.loginTime);
+    if (!isNaN(login)) {
+      const hoursPassed = (now - login) / (1000 * 60 * 60);
+      if (hoursPassed > 24) {
+        clearSessionById_(sessionId);
+        return null;
+      }
+    }
+    return s;
+  } catch (e) {
+    Logger.log("getSessionById_ error: " + e.toString());
+    return null;
+  }
+}
+
+function clearSessionById_(sessionId) {
+  try {
+    if (!sessionId) return;
+    const sp = PropertiesService.getScriptProperties();
+    sp.deleteProperty("session:" + sessionId);
+  } catch (e) {
+    Logger.log("clearSessionById_ error: " + e.toString());
   }
 }

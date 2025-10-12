@@ -54,7 +54,7 @@
     localStorage.setItem("theme", theme);
 
     // อัปเดตกราฟถ้ามี
-    if (window.chNcd) updateChartsTheme();
+    if (window.chTambon) updateChartsTheme();
   }
 
   function toggleTheme() {
@@ -63,13 +63,15 @@
   }
 
   function updateChartsTheme() {
-    if (window.chNcd) {
-      window.chNcd.dispose();
+    if (window.chTambon) {
       window.chFactors.dispose();
       window.chTambon.dispose();
-      window.chNcd = null;
+      window.chSickStatus.dispose();
+      window.chRiskStatus.dispose();
       window.chFactors = null;
       window.chTambon = null;
+      window.chSickStatus = null;
+      window.chRiskStatus = null;
       drawCharts();
     }
   }
@@ -162,6 +164,43 @@
     $("kpi-risk").textContent = ncdRisk;
     $("kpi-ok").textContent = ncdOk;
     $("kpi-finish").textContent = finished;
+    
+    // ภาพรวมการประเมิน
+    const normalCount = state.filtered.filter((r) => isThaiNormal(r[COL.ncd])).length;
+    const riskCount = state.filtered.filter((r) => includesThaiRisk(r[COL.ncd])).length;
+    const sickCount = total - normalCount - riskCount;
+    
+    $("overview-total").textContent = total;
+    $("overview-normal").textContent = normalCount;
+    $("overview-risk").textContent = riskCount;
+    $("overview-sick").textContent = sickCount;
+    
+    $("overview-normal-pct").textContent = `(${((normalCount / total * 100) || 0).toFixed(2)}%)`;
+    $("overview-risk-pct").textContent = `(${((riskCount / total * 100) || 0).toFixed(2)}%)`;
+    $("overview-sick-pct").textContent = `(${((sickCount / total * 100) || 0).toFixed(2)}%)`;
+    
+    // ข้อมูลตามประเภท - แก้ไขการนับให้ถูกต้อง
+    // สำหรับสูบบุหรี่: นับจากคอลัมน์สูบบุหรี่
+    const smokeData = state.filtered.map((r) => norm(r[COL.smoke]));
+    const smokeNormal = smokeData.filter((s) => s.includes("ไม่สูบ") || s === "ไม่สูบ").length;
+    const smokeRisk = smokeData.filter((s) => s.includes("สูบ") && !s.includes("ไม่สูบ")).length;
+    
+    // สำหรับแอลกอฮอล์: นับจากคอลัมน์แอลกอฮอล์
+    const alcoholData = state.filtered.map((r) => norm(r[COL.alcohol]));
+    const alcoholNormal = alcoholData.filter((s) => s.includes("ไม่ดื่ม") || s === "ไม่ดื่ม").length;
+    const alcoholRisk = alcoholData.filter((s) => s.includes("ดื่ม") && !s.includes("ไม่ดื่ม")).length;
+    
+    // สำหรับสุขภาพจิต: นับจากคอลัมน์สุขภาพจิต
+    const mentalData = state.filtered.map((r) => norm(r[COL.mental]));
+    const mentalNormal = mentalData.filter((s) => isThaiNormal(s)).length;
+    const mentalRisk = mentalData.filter((s) => includesThaiRisk(s)).length;
+    
+    $("smoke-normal").textContent = smokeNormal;
+    $("smoke-risk").textContent = smokeRisk;
+    $("alcohol-normal").textContent = alcoholNormal;
+    $("alcohol-risk").textContent = alcoholRisk;
+    $("mental-normal").textContent = mentalNormal;
+    $("mental-risk").textContent = mentalRisk;
   }
 
   function isThaiNormal(s) {
@@ -174,6 +213,9 @@
 
   function renderTable() {
     const tbody = document.querySelector("#tbl tbody");
+    // ถ้าไม่มีตาราง (ถูกลบออกจากหน้า dashboard) ก็ข้ามไป
+    if (!tbody) return;
+    
     tbody.innerHTML = state.filtered
       .slice(0, 200)
       .map((r) => {
@@ -210,10 +252,8 @@
    Charts
    ============================================ */
   function drawCharts() {
-    const el1 = document.getElementById("chart-ncd");
     const el2 = document.getElementById("chart-factors");
     const el3 = document.getElementById("chart-tambon");
-    window.chNcd = window.chNcd || echarts.init(el1);
     window.chFactors = window.chFactors || echarts.init(el2);
     window.chTambon = window.chTambon || echarts.init(el3);
 
@@ -221,27 +261,7 @@
     const textColor = isDark ? "#e7e9ee" : "#1a1d2e";
     const axisLineColor = isDark ? "#1c2342" : "#d1d5db";
 
-    // 1) ภาพรวม NCDs
-    const ncdCounts = countBy(state.filtered, (r) => norm(r[COL.ncd]));
-    window.chNcd.setOption({
-      tooltip: { trigger: "axis" },
-      textStyle: { color: textColor },
-      xAxis: {
-        type: "category",
-        data: Object.keys(ncdCounts),
-        axisLabel: { color: textColor },
-        axisLine: { lineStyle: { color: axisLineColor } },
-      },
-      yAxis: {
-        type: "value",
-        axisLabel: { color: textColor },
-        axisLine: { lineStyle: { color: axisLineColor } },
-        splitLine: { lineStyle: { color: axisLineColor } },
-      },
-      series: [{ type: "bar", data: Object.values(ncdCounts) }],
-    });
-
-    // 2) ปัจจัยเสี่ยง
+    // 1) ปัจจัยเสี่ยง
     const keys = [
       COL.obesity,
       COL.dm,
@@ -297,7 +317,7 @@
       ],
     });
 
-    // 3) Top ตำบล
+    // 2) Top ตำบล
     const tb = Object.entries(
       countBy(state.filtered, (r) => norm(r[COL.tambon]))
     )
@@ -321,12 +341,119 @@
       series: [{ type: "bar", data: tb.map((x) => x[1]).reverse() }],
     });
 
+    // 3) สถานะป่วยของผู้ประเมิน (นับคนที่ป่วยแต่ละโรค)
+    const el4 = document.getElementById("chart-sick-status");
+    const el5 = document.getElementById("chart-risk-status");
+    window.chSickStatus = window.chSickStatus || echarts.init(el4);
+    window.chRiskStatus = window.chRiskStatus || echarts.init(el5);
+    
+    // นับคนที่ป่วยแต่ละโรค (เสี่ยงสูง = ป่วย)
+    const obesitySick = state.filtered.filter((r) => {
+      const val = norm(r[COL.obesity]);
+      return val.includes("เสี่ยงสูง") || val.includes("ป่วย");
+    }).length;
+    
+    const dmSick = state.filtered.filter((r) => {
+      const val = norm(r[COL.dm]);
+      return val.includes("เสี่ยงสูง") || val.includes("ป่วย");
+    }).length;
+    
+    const htnSick = state.filtered.filter((r) => {
+      const val = norm(r[COL.htn]);
+      return val.includes("เสี่ยงสูง") || val.includes("ป่วย");
+    }).length;
+    
+    window.chSickStatus.setOption({
+      tooltip: {
+        trigger: 'item',
+        formatter: '{b}: {c} คน ({d}%)'
+      },
+      legend: {
+        orient: 'horizontal',
+        bottom: 10,
+        textStyle: { color: textColor }
+      },
+      series: [{
+        type: 'pie',
+        radius: ['40%', '70%'],
+        avoidLabelOverlap: false,
+        label: {
+          show: true,
+          formatter: '{b}\n{c} คน',
+          color: textColor
+        },
+        emphasis: {
+          label: {
+            show: true,
+            fontSize: 16,
+            fontWeight: 'bold'
+          }
+        },
+        data: [
+          { value: obesitySick, name: 'โรคอ้วน', itemStyle: { color: '#ffd37a' } },
+          { value: dmSick, name: 'เบาหวาน', itemStyle: { color: '#ff8f8f' } },
+          { value: htnSick, name: 'ความดัน', itemStyle: { color: '#ffb3b3' } }
+        ]
+      }]
+    });
+    
+    // 4) สถานะเสี่ยงของผู้ประเมิน (นับคนที่เสี่ยง)
+    const obesityRisk = state.filtered.filter((r) => {
+      const val = norm(r[COL.obesity]);
+      return val.includes("เสี่ยง") && !val.includes("เสี่ยงสูง");
+    }).length;
+    
+    const dmRisk = state.filtered.filter((r) => {
+      const val = norm(r[COL.dm]);
+      return val.includes("เสี่ยง") && !val.includes("เสี่ยงสูง");
+    }).length;
+    
+    const htnRisk = state.filtered.filter((r) => {
+      const val = norm(r[COL.htn]);
+      return val.includes("เสี่ยง") && !val.includes("เสี่ยงสูง");
+    }).length;
+    
+    window.chRiskStatus.setOption({
+      tooltip: {
+        trigger: 'item',
+        formatter: '{b}: {c} คน'
+      },
+      legend: {
+        orient: 'horizontal',
+        bottom: 10,
+        textStyle: { color: textColor }
+      },
+      series: [{
+        type: 'pie',
+        radius: ['40%', '70%'],
+        avoidLabelOverlap: false,
+        label: {
+          show: true,
+          formatter: '{b}\n{c} คน',
+          color: textColor
+        },
+        emphasis: {
+          label: {
+            show: true,
+            fontSize: 16,
+            fontWeight: 'bold'
+          }
+        },
+        data: [
+          { value: obesityRisk, name: 'โรคอ้วน', itemStyle: { color: '#ffd37a' } },
+          { value: dmRisk, name: 'เบาหวาน', itemStyle: { color: '#ff8f8f' } },
+          { value: htnRisk, name: 'ความดัน', itemStyle: { color: '#ffb3b3' } }
+        ]
+      }]
+    });
+
     window.addEventListener(
       "resize",
       () => {
-        window.chNcd.resize();
         window.chFactors.resize();
         window.chTambon.resize();
+        window.chSickStatus.resize();
+        window.chRiskStatus.resize();
       },
       { once: true }
     );
@@ -353,16 +480,20 @@
     const adminLoginBtn = $("admin-login-btn");
     if (adminLoginBtn) {
       adminLoginBtn.onclick = () => {
-        // ดึง URL จาก server และเพิ่ม query parameter
+        // แสดง loading
+        adminLoginBtn.disabled = true;
+        adminLoginBtn.innerHTML = '<span>⏳</span><span>Loading...</span>';
+        
+        // ดึง URL จาก server และเพิ่ม query parameter ไปหน้า login
         google.script.run
           .withSuccessHandler((url) => {
-            window.location.href = url + "?page=admin";
+            top.window.location.href = url + "?page=login";
           })
           .withFailureHandler((err) => {
             console.error("Error:", err);
-            // Fallback: ลองใช้ current URL
-            const currentUrl = window.location.href.split('?')[0];
-            window.location.href = currentUrl + "?page=admin";
+            alert("❌ เกิดข้อผิดพลาด: " + err.message);
+            adminLoginBtn.disabled = false;
+            adminLoginBtn.innerHTML = '<span>🔐</span><span>Admin Login</span>';
           })
           .getWebAppUrl();
       };
