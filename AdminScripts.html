@@ -319,16 +319,11 @@
       $("submit-record").disabled = true;
 
       if (isEditMode && !isNaN(editIndex)) {
-        // โหมดแก้ไข - อัปเดตข้อมูล
-        const originalRow = state.filtered[editIndex];
-        const rawIdx = state.raw.findIndex(r => 
-          r[COL.fname] === originalRow[COL.fname] &&
-          r[COL.lname] === originalRow[COL.lname] &&
-          r[COL.phone] === originalRow[COL.phone]
-        );
-
-        if (rawIdx === -1) {
-          showAlert(alert, "❌ ไม่พบข้อมูลในระบบ", "error");
+        // โหมดแก้ไข - อัปเดตข้อมูลด้วย UUID
+        const uuid = form.dataset.editUuid;
+        
+        if (!uuid) {
+          showAlert(alert, "❌ ไม่พบ UUID ของข้อมูล", "error");
           $("submit-record").disabled = false;
           return;
         }
@@ -351,7 +346,7 @@
             showAlert(alert, "❌ เกิดข้อผิดพลาด: " + err.message, "error");
             $("submit-record").disabled = false;
           })
-          .updateRecord(rawIdx + 2, record, sessionId); // +2 เพราะ header + 0-indexed
+          .updateRecordByUuid(uuid, record, sessionId);
       } else {
         // โหมดเพิ่มใหม่
         google.script.run
@@ -512,9 +507,47 @@
   }
 
   /* ============================================
+   Export Data
+   ============================================ */
+  function initExportData() {
+    const exportBtn = $("export-btn");
+    if (!exportBtn) return;
+
+    exportBtn.onclick = () => {
+      if (!confirm("ต้องการส่งออกข้อมูลทั้งหมดของอำเภอนี้หรือไม่?\n\nไฟล์ที่ส่งออกจะมี UUID สำหรับการนำเข้าครั้งต่อไป")) {
+        return;
+      }
+
+      exportBtn.disabled = true;
+      exportBtn.innerHTML = '<span>⏳</span><span>กำลังส่งออก...</span>';
+
+      const sessionId = localStorage.getItem('ncd_session_id');
+      google.script.run
+        .withSuccessHandler((result) => {
+          exportBtn.disabled = false;
+          exportBtn.innerHTML = '<span>📤</span><span>ส่งออกข้อมูล</span>';
+
+          if (result.success) {
+            alert("✅ " + result.message + "\n\nกำลังเปิดไฟล์...");
+            window.open(result.url, "_blank");
+          } else {
+            alert("❌ " + result.message);
+          }
+        })
+        .withFailureHandler((err) => {
+          exportBtn.disabled = false;
+          exportBtn.innerHTML = '<span>📤</span><span>ส่งออกข้อมูล</span>';
+          alert("❌ เกิดข้อผิดพลาด: " + err.message);
+        })
+        .exportDataWithUuid(sessionId);
+    };
+  }
+
+  /* ============================================
    Data Management
    ============================================ */
   const COL = {
+    id: "id",
     fname: "ชื่อ",
     lname: "นามสกุล",
     village: "ชื่อหมู่บ้าน",
@@ -756,8 +789,9 @@
       modalHeader.textContent = "✏️ แก้ไขข้อมูล";
     }
 
-    // เก็บ index ไว้ในฟอร์ม
+    // เก็บ UUID และ index ไว้ในฟอร์ม
     form.dataset.editIndex = idx;
+    form.dataset.editUuid = row[COL.id] || "";
     form.dataset.editMode = "true";
   }
 
@@ -768,25 +802,19 @@
       return;
     }
 
+    const uuid = row[COL.id];
+    if (!uuid) {
+      alert("❌ ไม่พบ UUID ของข้อมูล");
+      return;
+    }
+
     const name = `${row[COL.fname] || ""} ${row[COL.lname] || ""}`.trim();
     
     if (!confirm(`คุณต้องการลบข้อมูลของ "${name}" หรือไม่?\n\n⚠️ การลบจะไม่สามารถย้อนกลับได้`)) {
       return;
     }
 
-    console.log("Deleting record:", row);
-
-    // หา row index ใน raw data
-    const rawIdx = state.raw.findIndex(r => 
-      r[COL.fname] === row[COL.fname] &&
-      r[COL.lname] === row[COL.lname] &&
-      r[COL.phone] === row[COL.phone]
-    );
-
-    if (rawIdx === -1) {
-      alert("❌ ไม่พบข้อมูลในระบบ");
-      return;
-    }
+    console.log("Deleting record UUID:", uuid);
 
     // แสดง loading
     const loadingIndicator = $("loading-indicator");
@@ -794,7 +822,7 @@
       loadingIndicator.style.display = "block";
     }
 
-    // เรียก API ลบข้อมูล
+    // เรียก API ลบข้อมูลด้วย UUID
     const sessionId = localStorage.getItem('ncd_session_id');
     google.script.run
       .withSuccessHandler((result) => {
@@ -804,9 +832,8 @@
 
         if (result.success) {
           alert("✅ " + result.message);
-          // ลบออกจาก state
-          state.raw.splice(rawIdx, 1);
-          applyFilters();
+          // รีโหลดข้อมูลใหม่
+          loadData();
         } else {
           alert("❌ " + result.message);
         }
@@ -818,7 +845,7 @@
         console.error("Delete failed:", err);
         alert("❌ เกิดข้อผิดพลาด: " + err.message);
       })
-      .deleteRecord(rawIdx + 2, sessionId); // +2 เพราะ header + 0-indexed
+      .deleteRecordByUuid(uuid, sessionId);
   }
 
   /* ============================================
@@ -835,6 +862,7 @@
     initLogout();
     initAddRecordForm();
     initImportData();
+    initExportData();
     initCRUD();
   })();
 </script>

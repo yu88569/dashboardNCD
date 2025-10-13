@@ -402,7 +402,47 @@ function getTemplateHeaders() {
   return headers.map((h) => String(h).trim());
 }
 
-/** ====== UTILITY: CREATE UNIQUE KEY ====== **/
+/** ====== UTILITY: ENSURE UUID COLUMN EXISTS ====== **/
+function ensureUuidColumn() {
+  try {
+    const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
+    const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+    
+    // เช็คว่ามีคอลัมน์ "id" หรือยัง
+    const uuidIdx = headers.findIndex(h => String(h).trim().toLowerCase() === "id");
+    
+    if (uuidIdx === -1) {
+      // ยังไม่มีคอลัมน์ id - เพิ่มเป็นคอลัมน์แรก
+      sh.insertColumnBefore(1);
+      sh.getRange(1, 1).setValue("id");
+      
+      // สร้าง UUID ให้กับข้อมูลเดิมทั้งหมด
+      const lastRow = sh.getLastRow();
+      if (lastRow > 1) {
+        const uuids = [];
+        for (let i = 2; i <= lastRow; i++) {
+          uuids.push([Utilities.getUuid()]);
+        }
+        sh.getRange(2, 1, uuids.length, 1).setValues(uuids);
+      }
+      
+      Logger.log("UUID column created and populated");
+      return 0; // คอลัมน์แรก
+    }
+    
+    return uuidIdx;
+  } catch (error) {
+    Logger.log("Error ensuring UUID column: " + error.toString());
+    throw error;
+  }
+}
+
+/** ====== UTILITY: GET UUID INDEX ====== **/
+function getUuidColumnIndex(headers) {
+  return headers.findIndex(h => String(h).trim().toLowerCase() === "id");
+}
+
+/** ====== DEPRECATED: CREATE UNIQUE KEY (kept for migration) ====== **/
 function createUniqueKey(row, headers) {
   const trim = (v) => String(v || "").trim();
 
@@ -433,7 +473,7 @@ function createUniqueKey(row, headers) {
   return `${fname}|${lname}|${house}|${tambon}|${amphoe}`.toUpperCase();
 }
 
-/** ====== IMPORT DATA FROM CSV/EXCEL (WITH UPDATE SUPPORT) ====== **/
+/** ====== IMPORT DATA FROM CSV/EXCEL (WITH UUID SUPPORT) ====== **/
 function importData(csvData, sessionId) {
   try {
     // เช็ค session และดึงอำเภอของ admin
@@ -446,6 +486,9 @@ function importData(csvData, sessionId) {
     if (!adminAmphoe) {
       return { success: false, message: "ไม่ได้กำหนดอำเภอสำหรับ admin นี้" };
     }
+    
+    // ตรวจสอบและสร้างคอลัมน์ UUID ถ้ายังไม่มี
+    ensureUuidColumn();
     
     const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
     const existingHeaders = sh
@@ -476,20 +519,15 @@ function importData(csvData, sessionId) {
 
     const [headers, ...dataRows] = rows;
     
-    // หา index ของคอลัมน์อำเภอ
+    // หา index ของคอลัมน์สำคัญ
+    const uuidIdx = getUuidColumnIndex(existingHeaders);
     const amphoeIdx = existingHeaders.findIndex(h => String(h).trim() === "อำเภอ");
+    const fnameIdx = existingHeaders.findIndex(h => String(h).trim() === "ชื่อ");
+    const lnameIdx = existingHeaders.findIndex(h => String(h).trim() === "นามสกุล");
 
-    // ตรวจสอบว่า headers ตรงกันหรือไม่
-    const headerMatch = headers.every(
-      (h, i) => String(h).trim() === String(existingHeaders[i]).trim()
-    );
-
-    if (!headerMatch) {
-      return {
-        success: false,
-        message: "หัวตารางไม่ตรงกับ template กรุณาใช้ template ที่ถูกต้อง",
-      };
-    }
+    // ตรวจสอบว่า headers ตรงกันหรือไม่ (อนุญาตให้ไฟล์ไม่มี id ก็ได้)
+    const importHasUuid = headers.some(h => String(h).trim().toLowerCase() === "id");
+    const importUuidIdx = headers.findIndex(h => String(h).trim().toLowerCase() === "id");
 
     // อ่านข้อมูลที่มีอยู่ทั้งหมด (ไม่รวม header)
     const lastRow = sh.getLastRow();
@@ -498,11 +536,13 @@ function importData(csvData, sessionId) {
         ? sh.getRange(2, 1, lastRow - 1, existingHeaders.length).getValues()
         : [];
 
-    // สร้าง Map ของข้อมูลเดิม (key => row number)
+    // สร้าง Map ของข้อมูลเดิม (UUID => row number)
     const existingMap = new Map();
     existingData.forEach((row, idx) => {
-      const key = createUniqueKey(row, existingHeaders);
-      existingMap.set(key, { rowNum: idx + 2, data: row }); // +2 เพราะเริ่มแถวที่ 2 (ข้าม header)
+      const uuid = uuidIdx !== -1 ? String(row[uuidIdx]).trim() : "";
+      if (uuid) {
+        existingMap.set(uuid, { rowNum: idx + 2, data: row }); // +2 เพราะเริ่มแถวที่ 2 (ข้าม header)
+      }
     });
 
     // ประมวลผลข้อมูลใหม่
@@ -511,15 +551,18 @@ function importData(csvData, sessionId) {
     const newRows = [];
 
     dataRows.forEach((row) => {
-      // ปกปิดชื่อและนามสกุลก่อน
-      const maskedRow = [...row];
-      const fnameIdx = existingHeaders.findIndex(
-        (h) => String(h).trim() === "ชื่อ"
-      );
-      const lnameIdx = existingHeaders.findIndex(
-        (h) => String(h).trim() === "นามสกุล"
-      );
+      // ปรับขนาด row ให้ตรงกับ existingHeaders
+      const maskedRow = new Array(existingHeaders.length).fill("");
+      
+      // คัดลอกข้อมูลจาก import
+      headers.forEach((header, i) => {
+        const targetIdx = existingHeaders.findIndex(h => String(h).trim() === String(header).trim());
+        if (targetIdx !== -1 && i < row.length) {
+          maskedRow[targetIdx] = row[i];
+        }
+      });
 
+      // ปกปิดชื่อและนามสกุล
       if (fnameIdx !== -1 && maskedRow[fnameIdx]) {
         maskedRow[fnameIdx] = maskName(String(maskedRow[fnameIdx]));
       }
@@ -532,19 +575,24 @@ function importData(csvData, sessionId) {
         maskedRow[amphoeIdx] = adminAmphoe;
       }
 
-      // สร้าง key จากข้อมูลที่ปกปิดแล้ว
-      const key = createUniqueKey(maskedRow, existingHeaders);
+      // ดึง UUID จากไฟล์ import (ถ้ามี)
+      let uuid = "";
+      if (importHasUuid && importUuidIdx !== -1 && importUuidIdx < row.length) {
+        uuid = String(row[importUuidIdx]).trim();
+      }
 
-      // ตรวจสอบว่ามีข้อมูลเดิมหรือไม่
-      if (existingMap.has(key)) {
-        // อัปเดตข้อมูลเดิม
-        const existing = existingMap.get(key);
-        sh.getRange(existing.rowNum, 1, 1, maskedRow.length).setValues([
-          maskedRow,
-        ]);
+      // ตรวจสอบว่ามี UUID และมีข้อมูลเดิมหรือไม่
+      if (uuid && existingMap.has(uuid)) {
+        // อัปเดตข้อมูลเดิมตาม UUID
+        const existing = existingMap.get(uuid);
+        maskedRow[uuidIdx] = uuid; // เก็บ UUID เดิม
+        sh.getRange(existing.rowNum, 1, 1, maskedRow.length).setValues([maskedRow]);
         updateCount++;
       } else {
-        // เก็บไว้เพิ่มใหม่ทีหลัง
+        // เพิ่มใหม่ - สร้าง UUID ใหม่
+        if (uuidIdx !== -1) {
+          maskedRow[uuidIdx] = Utilities.getUuid();
+        }
         newRows.push(maskedRow);
         addCount++;
       }
@@ -579,7 +627,7 @@ function importData(csvData, sessionId) {
   }
 }
 
-/** ====== ADD/UPDATE SINGLE RECORD ====== **/
+/** ====== ADD SINGLE RECORD (WITH UUID) ====== **/
 function addSingleRecord(recordData, sessionId) {
   try {
     // เช็ค session และดึงอำเภอของ admin
@@ -593,12 +641,25 @@ function addSingleRecord(recordData, sessionId) {
       return { success: false, message: "ไม่ได้กำหนดอำเภอสำหรับ admin นี้" };
     }
     
+    // ตรวจสอบและสร้างคอลัมน์ UUID ถ้ายังไม่มี
+    ensureUuidColumn();
+    
     const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
     const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+    const uuidIdx = getUuidColumnIndex(headers);
 
-    // สร้าง array ของข้อมูลตามลำดับ headers และปกปิดชื่อ-นามสกุล
+    // สร้าง UUID ใหม่สำหรับรายการนี้
+    const newUuid = Utilities.getUuid();
+
+    // สร้าง array ของข้อมูลตามลำดับ headers
     const rowData = headers.map((header) => {
       const key = String(header).trim();
+      
+      // UUID - ใช้ค่าที่สร้างใหม่
+      if (key.toLowerCase() === "id") {
+        return newUuid;
+      }
+      
       let value = recordData[key] || "";
 
       // ปกปิดชื่อและนามสกุล
@@ -614,60 +675,23 @@ function addSingleRecord(recordData, sessionId) {
       return value;
     });
 
-    // อ่านข้อมูลที่มีอยู่เพื่อตรวจสอบการซ้ำ
-    const lastRow = sh.getLastRow();
-    const existingData =
-      lastRow > 1
-        ? sh.getRange(2, 1, lastRow - 1, headers.length).getValues()
-        : [];
+    // เพิ่มแถวใหม่
+    const newRow = sh.getLastRow() + 1;
+    sh.getRange(newRow, 1, 1, rowData.length).setValues([rowData]);
 
-    // สร้าง key จากข้อมูลใหม่
-    const newKey = createUniqueKey(rowData, headers);
+    // ล้าง cache
+    const cache = CacheService.getScriptCache();
+    cache.remove("rows");
+    cache.remove("admin_rows_" + adminAmphoe);
 
-    // หาว่ามีข้อมูลซ้ำหรือไม่
-    let foundRow = -1;
-    for (let i = 0; i < existingData.length; i++) {
-      const existingKey = createUniqueKey(existingData[i], headers);
-      if (existingKey === newKey) {
-        foundRow = i + 2; // +2 เพราะเริ่มแถวที่ 2 (ข้าม header)
-        break;
-      }
-    }
-
-    if (foundRow > 0) {
-      // อัปเดตข้อมูลเดิม
-      sh.getRange(foundRow, 1, 1, rowData.length).setValues([rowData]);
-
-      // ล้าง cache
-      const cache = CacheService.getScriptCache();
-      cache.remove("rows");
-      cache.remove("admin_rows_" + adminAmphoe);
-
-      return {
-        success: true,
-        message: "อัปเดตข้อมูลสำเร็จ (อำเภอ: " + adminAmphoe + ")",
-        action: "update",
-        row: foundRow,
-        amphoe: adminAmphoe,
-      };
-    } else {
-      // เพิ่มแถวใหม่
-      const newRow = sh.getLastRow() + 1;
-      sh.getRange(newRow, 1, 1, rowData.length).setValues([rowData]);
-
-      // ล้าง cache
-      const cache = CacheService.getScriptCache();
-      cache.remove("rows");
-      cache.remove("admin_rows_" + adminAmphoe);
-
-      return {
-        success: true,
-        message: "เพิ่มข้อมูลใหม่สำเร็จ (อำเภอ: " + adminAmphoe + ")",
-        action: "add",
-        row: newRow,
-        amphoe: adminAmphoe,
-      };
-    }
+    return {
+      success: true,
+      message: "เพิ่มข้อมูลใหม่สำเร็จ",
+      action: "add",
+      row: newRow,
+      uuid: newUuid,
+      amphoe: adminAmphoe,
+    };
   } catch (error) {
     return {
       success: false,
@@ -676,8 +700,8 @@ function addSingleRecord(recordData, sessionId) {
   }
 }
 
-/** ====== UPDATE RECORD (BY ROW INDEX) ====== **/
-function updateRecord(rowIndex, recordData, sessionId) {
+/** ====== UPDATE RECORD BY UUID ====== **/
+function updateRecordByUuid(uuid, recordData, sessionId) {
   try {
     // เช็ค session และดึงอำเภอของ admin
     const session = sessionId ? getSessionById_(sessionId) : getSession();
@@ -690,18 +714,36 @@ function updateRecord(rowIndex, recordData, sessionId) {
       return { success: false, message: "ไม่ได้กำหนดอำเภอสำหรับ admin นี้" };
     }
     
+    ensureUuidColumn();
+    
     const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
     const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+    const uuidIdx = getUuidColumnIndex(headers);
     
-    // ตรวจสอบว่า rowIndex อยู่ในช่วงที่ถูกต้อง
-    if (rowIndex < 2 || rowIndex > sh.getLastRow()) {
-      return { success: false, message: "ตำแหน่งข้อมูลไม่ถูกต้อง" };
+    if (uuidIdx === -1) {
+      return { success: false, message: "ไม่พบคอลัมน์ id" };
     }
     
-    // ตรวจสอบว่าแถวนี้เป็นของอำเภอเดียวกันหรือไม่
-    const amphoeCol = headers.findIndex(h => String(h).trim() === "อำเภอ");
-    if (amphoeCol !== -1) {
-      const currentAmphoe = sh.getRange(rowIndex, amphoeCol + 1).getValue();
+    // หาแถวที่มี UUID ตรงกัน
+    const lastRow = sh.getLastRow();
+    let targetRow = -1;
+    
+    for (let i = 2; i <= lastRow; i++) {
+      const cellUuid = sh.getRange(i, uuidIdx + 1).getValue();
+      if (String(cellUuid).trim() === String(uuid).trim()) {
+        targetRow = i;
+        break;
+      }
+    }
+    
+    if (targetRow === -1) {
+      return { success: false, message: "ไม่พบข้อมูลที่ต้องการแก้ไข" };
+    }
+    
+    // ตรวจสอบว่าเป็นของอำเภอเดียวกันหรือไม่
+    const amphoeIdx = headers.findIndex(h => String(h).trim() === "อำเภอ");
+    if (amphoeIdx !== -1) {
+      const currentAmphoe = sh.getRange(targetRow, amphoeIdx + 1).getValue();
       if (String(currentAmphoe).trim() !== adminAmphoe) {
         return { success: false, message: "ไม่สามารถแก้ไขข้อมูลของอำเภออื่นได้" };
       }
@@ -710,6 +752,12 @@ function updateRecord(rowIndex, recordData, sessionId) {
     // สร้าง array ของข้อมูลตามลำดับ headers
     const rowData = headers.map((header) => {
       const key = String(header).trim();
+      
+      // เก็บ UUID เดิม
+      if (key.toLowerCase() === "id") {
+        return uuid;
+      }
+      
       let value = recordData[key] || "";
 
       // ปกปิดชื่อและนามสกุล
@@ -717,7 +765,7 @@ function updateRecord(rowIndex, recordData, sessionId) {
         value = maskName(String(value));
       }
       
-      // บังคับอำเภอตาม admin (ป้องกันการแก้ไขอำเภอ)
+      // บังคับอำเภอตาม admin
       if (key === "อำเภอ") {
         value = adminAmphoe;
       }
@@ -726,7 +774,7 @@ function updateRecord(rowIndex, recordData, sessionId) {
     });
 
     // อัปเดตข้อมูล
-    sh.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
+    sh.getRange(targetRow, 1, 1, rowData.length).setValues([rowData]);
 
     // ล้าง cache
     const cache = CacheService.getScriptCache();
@@ -736,7 +784,8 @@ function updateRecord(rowIndex, recordData, sessionId) {
     return {
       success: true,
       message: "แก้ไขข้อมูลสำเร็จ",
-      row: rowIndex,
+      uuid: uuid,
+      row: targetRow,
       amphoe: adminAmphoe,
     };
   } catch (error) {
@@ -747,8 +796,37 @@ function updateRecord(rowIndex, recordData, sessionId) {
   }
 }
 
-/** ====== DELETE RECORD (BY ROW INDEX) ====== **/
-function deleteRecord(rowIndex, sessionId) {
+/** ====== DEPRECATED: UPDATE RECORD BY ROW INDEX ====== **/
+function updateRecord(rowIndex, recordData, sessionId) {
+  // Kept for backward compatibility
+  Logger.log("WARNING: updateRecord by rowIndex is deprecated. Use updateRecordByUuid instead.");
+  
+  try {
+    const session = sessionId ? getSessionById_(sessionId) : getSession();
+    if (!session) {
+      return { success: false, message: "ไม่ได้ล็อกอิน" };
+    }
+    
+    const adminAmphoe = session.amphoe;
+    const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
+    const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+    const uuidIdx = getUuidColumnIndex(headers);
+    
+    if (uuidIdx !== -1 && rowIndex >= 2 && rowIndex <= sh.getLastRow()) {
+      const uuid = sh.getRange(rowIndex, uuidIdx + 1).getValue();
+      if (uuid) {
+        return updateRecordByUuid(String(uuid), recordData, sessionId);
+      }
+    }
+    
+    return { success: false, message: "ไม่สามารถอัปเดตได้" };
+  } catch (error) {
+    return { success: false, message: error.toString() };
+  }
+}
+
+/** ====== DELETE RECORD BY UUID ====== **/
+function deleteRecordByUuid(uuid, sessionId) {
   try {
     // เช็ค session และดึงอำเภอของ admin
     const session = sessionId ? getSessionById_(sessionId) : getSession();
@@ -761,25 +839,43 @@ function deleteRecord(rowIndex, sessionId) {
       return { success: false, message: "ไม่ได้กำหนดอำเภอสำหรับ admin นี้" };
     }
     
+    ensureUuidColumn();
+    
     const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
     const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+    const uuidIdx = getUuidColumnIndex(headers);
     
-    // ตรวจสอบว่า rowIndex อยู่ในช่วงที่ถูกต้อง
-    if (rowIndex < 2 || rowIndex > sh.getLastRow()) {
-      return { success: false, message: "ตำแหน่งข้อมูลไม่ถูกต้อง" };
+    if (uuidIdx === -1) {
+      return { success: false, message: "ไม่พบคอลัมน์ id" };
     }
     
-    // ตรวจสอบว่าแถวนี้เป็นของอำเภอเดียวกันหรือไม่
-    const amphoeCol = headers.findIndex(h => String(h).trim() === "อำเภอ");
-    if (amphoeCol !== -1) {
-      const currentAmphoe = sh.getRange(rowIndex, amphoeCol + 1).getValue();
+    // หาแถวที่มี UUID ตรงกัน
+    const lastRow = sh.getLastRow();
+    let targetRow = -1;
+    
+    for (let i = 2; i <= lastRow; i++) {
+      const cellUuid = sh.getRange(i, uuidIdx + 1).getValue();
+      if (String(cellUuid).trim() === String(uuid).trim()) {
+        targetRow = i;
+        break;
+      }
+    }
+    
+    if (targetRow === -1) {
+      return { success: false, message: "ไม่พบข้อมูลที่ต้องการลบ" };
+    }
+    
+    // ตรวจสอบว่าเป็นของอำเภอเดียวกันหรือไม่
+    const amphoeIdx = headers.findIndex(h => String(h).trim() === "อำเภอ");
+    if (amphoeIdx !== -1) {
+      const currentAmphoe = sh.getRange(targetRow, amphoeIdx + 1).getValue();
       if (String(currentAmphoe).trim() !== adminAmphoe) {
         return { success: false, message: "ไม่สามารถลบข้อมูลของอำเภออื่นได้" };
       }
     }
     
     // ลบแถว
-    sh.deleteRow(rowIndex);
+    sh.deleteRow(targetRow);
 
     // ล้าง cache
     const cache = CacheService.getScriptCache();
@@ -789,6 +885,7 @@ function deleteRecord(rowIndex, sessionId) {
     return {
       success: true,
       message: "ลบข้อมูลสำเร็จ",
+      uuid: uuid,
       amphoe: adminAmphoe,
     };
   } catch (error) {
@@ -796,6 +893,34 @@ function deleteRecord(rowIndex, sessionId) {
       success: false,
       message: "เกิดข้อผิดพลาด: " + error.toString(),
     };
+  }
+}
+
+/** ====== DEPRECATED: DELETE RECORD BY ROW INDEX ====== **/
+function deleteRecord(rowIndex, sessionId) {
+  // Kept for backward compatibility
+  Logger.log("WARNING: deleteRecord by rowIndex is deprecated. Use deleteRecordByUuid instead.");
+  
+  try {
+    const session = sessionId ? getSessionById_(sessionId) : getSession();
+    if (!session) {
+      return { success: false, message: "ไม่ได้ล็อกอิน" };
+    }
+    
+    const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
+    const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+    const uuidIdx = getUuidColumnIndex(headers);
+    
+    if (uuidIdx !== -1 && rowIndex >= 2 && rowIndex <= sh.getLastRow()) {
+      const uuid = sh.getRange(rowIndex, uuidIdx + 1).getValue();
+      if (uuid) {
+        return deleteRecordByUuid(String(uuid), sessionId);
+      }
+    }
+    
+    return { success: false, message: "ไม่สามารถลบได้" };
+  } catch (error) {
+    return { success: false, message: error.toString() };
   }
 }
 
@@ -887,6 +1012,84 @@ function getTemplateUrl() {
     return {
       success: false,
       message: "เกิดข้อผิดพลาดในการสร้าง template: " + error.toString(),
+    };
+  }
+}
+
+/** ====== EXPORT DATA WITH UUID ====== **/
+function exportDataWithUuid(sessionId) {
+  try {
+    // เช็ค session และดึงอำเภอของ admin
+    const session = sessionId ? getSessionById_(sessionId) : getSession();
+    if (!session) {
+      return { success: false, message: "ไม่ได้ล็อกอิน" };
+    }
+    
+    const adminAmphoe = session.amphoe;
+    if (!adminAmphoe) {
+      return { success: false, message: "ไม่ได้กำหนดอำเภอสำหรับ admin นี้" };
+    }
+    
+    ensureUuidColumn();
+    
+    const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
+    const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+    const amphoeIdx = headers.findIndex(h => String(h).trim() === "อำเภอ");
+    
+    // อ่านข้อมูลทั้งหมด
+    const lastRow = sh.getLastRow();
+    if (lastRow < 2) {
+      return { success: false, message: "ไม่มีข้อมูลสำหรับส่งออก" };
+    }
+    
+    const allData = sh.getRange(2, 1, lastRow - 1, headers.length).getValues();
+    
+    // กรองเฉพาะข้อมูลของอำเภอนี้
+    const filteredData = allData.filter(row => {
+      if (amphoeIdx !== -1) {
+        return String(row[amphoeIdx]).trim() === adminAmphoe;
+      }
+      return true;
+    });
+    
+    if (filteredData.length === 0) {
+      return { success: false, message: "ไม่มีข้อมูลสำหรับอำเภอ " + adminAmphoe };
+    }
+    
+    // สร้าง spreadsheet ใหม่สำหรับ export
+    const exportSS = SpreadsheetApp.create("NCDs_Export_" + adminAmphoe + "_" + new Date().toISOString().split('T')[0]);
+    const exportSheet = exportSS.getSheets()[0];
+    exportSheet.setName("ncd_data");
+    
+    // ใส่ headers
+    exportSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    exportSheet
+      .getRange(1, 1, 1, headers.length)
+      .setBackground("#4c74ff")
+      .setFontColor("#ffffff")
+      .setFontWeight("bold");
+    
+    // ใส่ข้อมูล
+    exportSheet.getRange(2, 1, filteredData.length, headers.length).setValues(filteredData);
+    
+    // ปรับความกว้างคอลัมน์
+    for (let i = 1; i <= headers.length; i++) {
+      exportSheet.autoResizeColumn(i);
+    }
+    
+    const url = exportSS.getUrl();
+    
+    return {
+      success: true,
+      url: url,
+      message: "ส่งออกข้อมูลสำเร็จ (" + filteredData.length + " รายการ)",
+      count: filteredData.length,
+      amphoe: adminAmphoe,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: "เกิดข้อผิดพลาด: " + error.toString(),
     };
   }
 }
