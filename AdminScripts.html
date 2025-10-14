@@ -3,27 +3,31 @@
 
   // SessionId helper (จาก URL หรือ localStorage)
   function getQueryParam(name) {
-    const m = new RegExp('(^|&)' + name + '=([^&]*)').exec(window.location.search.substring(1));
+    const m = new RegExp("(^|&)" + name + "=([^&]*)").exec(
+      window.location.search.substring(1)
+    );
     return m ? decodeURIComponent(m[2]) : null;
   }
   let sessionId = (function () {
     // ลองอ่านจาก localStorage ก่อน (จาก Login.html)
-    try { 
-      const sid = localStorage.getItem('ncd_session_id');
+    try {
+      const sid = localStorage.getItem("ncd_session_id");
       if (sid) {
         console.log("Session ID from localStorage:", sid);
         return sid;
       }
     } catch (_) {}
-    
+
     // ถ้าไม่มี ลองอ่านจาก URL
-    const sidFromUrl = getQueryParam('sid');
+    const sidFromUrl = getQueryParam("sid");
     if (sidFromUrl) {
-      try { localStorage.setItem('ncd_session_id', sidFromUrl); } catch (_) {}
+      try {
+        localStorage.setItem("ncd_session_id", sidFromUrl);
+      } catch (_) {}
       console.log("Session ID from URL:", sidFromUrl);
       return sidFromUrl;
     }
-    
+
     console.warn("No session ID found");
     return null;
   })();
@@ -64,8 +68,13 @@
 
   function checkSession() {
     sessionCheckAttempts++;
-    console.log("Checking session with sessionId:", sessionId, "attempt:", sessionCheckAttempts);
-    
+    console.log(
+      "Checking session with sessionId:",
+      sessionId,
+      "attempt:",
+      sessionCheckAttempts
+    );
+
     // ถ้าไม่มี sessionId ให้ redirect ทันที
     if (!sessionId) {
       console.error("No session ID found");
@@ -79,7 +88,7 @@
         .getWebAppUrl();
       return;
     }
-    
+
     // Timeout สำหรับการเช็ค session
     const timeoutId = setTimeout(() => {
       console.error("Session check timeout");
@@ -87,40 +96,46 @@
         console.log("Retrying session check...");
         setTimeout(checkSession, 1000);
       } else {
-        alert("❌ ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้\nกรุณา refresh หน้าเว็บ (Ctrl+F5)");
+        alert(
+          "❌ ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้\nกรุณา refresh หน้าเว็บ (Ctrl+F5)"
+        );
       }
     }, 10000); // 10 วินาที timeout
-    
+
     google.script.run
       .withSuccessHandler((result) => {
         clearTimeout(timeoutId);
         console.log("Session result:", result);
-        
+
         // ตรวจสอบว่า result เป็น null หรือไม่
         if (!result) {
           console.error("Result is null, attempt:", sessionCheckAttempts);
-          
+
           if (sessionCheckAttempts < MAX_SESSION_CHECK_ATTEMPTS) {
             console.log("Retrying after 1 second...");
             setTimeout(checkSession, 1000);
             return;
           }
-          
+
           // ล้าง session ที่เก่าออก
           console.log("Clearing session and redirecting...");
-          
+
           google.script.run
             .withSuccessHandler((result) => {
               // Redirect ไปหน้า dashboard
               if (result.redirectUrl) {
-                alert("❌ Session หมดอายุหรือไม่ถูกต้อง\nกำลังพาคุณกลับไปหน้า Dashboard\n\nกรุณา Login ใหม่โดยกดปุ่ม 'Admin Login'");
+                alert(
+                  "❌ Session หมดอายุหรือไม่ถูกต้อง\nกำลังพาคุณกลับไปหน้า Dashboard\n\nกรุณา Login ใหม่โดยกดปุ่ม 'Admin Login'"
+                );
                 setTimeout(() => {
                   top.window.location.href = result.redirectUrl;
                 }, 2000);
               }
             })
             .withFailureHandler(() => {
-              alert("❌ ไม่สามารถตรวจสอบ session ได้\nกรุณากลับไปหน้า Dashboard และ Login ใหม่\n\nกด OK เพื่อกลับไปหน้า Dashboard");
+              alert(
+                "❌ ไม่สามารถตรวจสอบ session ได้\nกรุณากลับไปหน้า Dashboard และ Login ใหม่\n\nกด OK เพื่อกลับไปหน้า Dashboard"
+              );
               google.script.run
                 .withSuccessHandler((url) => {
                   setTimeout(() => {
@@ -132,12 +147,15 @@
             .logout(sessionId);
           return;
         }
-        
+
         if (!result.success) {
           // ถ้าไม่มี session ให้ไป login (backend จะ redirect อัตโนมัติ)
           console.log("Session check failed:", result.message);
-          alert("Session หมดอายุ กรุณา login ใหม่" + (result.message ? "\n" + result.message : ""));
-          
+          alert(
+            "Session หมดอายุ กรุณา login ใหม่" +
+              (result.message ? "\n" + result.message : "")
+          );
+
           // Redirect ไปหน้า dashboard
           google.script.run
             .withSuccessHandler((url) => {
@@ -147,28 +165,30 @@
         } else {
           $("username-display").textContent = result.username;
           userAmphoe = result.amphoe || "";
-          
+
           console.log("User amphoe:", userAmphoe);
-          
+
           // ตรวจสอบว่ามีอำเภอหรือไม่
           if (!userAmphoe) {
-            alert("⚠️ ไม่พบข้อมูลอำเภอของ admin นี้\nกรุณาตรวจสอบว่ามีการกำหนดอำเภอในชีท user หรือไม่");
+            alert(
+              "⚠️ ไม่พบข้อมูลอำเภอของ admin นี้\nกรุณาตรวจสอบว่ามีการกำหนดอำเภอในชีท user หรือไม่"
+            );
             $("amphoe-display").textContent = "(ไม่ได้กำหนด)";
             $("amphoe-display").style.color = "red";
             $("amphoe-title").textContent = "(ไม่ได้กำหนด)";
             return;
           }
-          
+
           // แสดงอำเภอในหลายจุด
           if ($("amphoe-display")) $("amphoe-display").textContent = userAmphoe;
           if ($("amphoe-title")) $("amphoe-title").textContent = userAmphoe;
-          
+
           // เติมค่าอำเภอในฟอร์มเพิ่มรายการ
           const amphoeInput = $("amphoe-input");
           if (amphoeInput) {
             amphoeInput.value = userAmphoe;
           }
-          
+
           // โหลดข้อมูล
           loadData();
         }
@@ -176,15 +196,19 @@
       .withFailureHandler((err) => {
         clearTimeout(timeoutId);
         console.error("Session check failed:", err);
-        
+
         if (sessionCheckAttempts < MAX_SESSION_CHECK_ATTEMPTS) {
           console.log("Retrying after error, attempt:", sessionCheckAttempts);
           setTimeout(checkSession, 1000);
           return;
         }
-        
-        alert("❌ เกิดข้อผิดพลาด: " + err.message + "\n\nกรุณาลองใหม่:\n1. Refresh หน้าเว็บ (Ctrl+F5)\n2. Logout และ Login ใหม่\n3. ตรวจสอบสิทธิ์การเข้าถึง Google Apps Script");
-        
+
+        alert(
+          "❌ เกิดข้อผิดพลาด: " +
+            err.message +
+            "\n\nกรุณาลองใหม่:\n1. Refresh หน้าเว็บ (Ctrl+F5)\n2. Logout และ Login ใหม่\n3. ตรวจสอบสิทธิ์การเข้าถึง Google Apps Script"
+        );
+
         // Redirect ไปหน้า dashboard
         google.script.run
           .withSuccessHandler((url) => {
@@ -202,25 +226,30 @@
       if (confirm("คุณต้องการออกจากระบบหรือไม่?")) {
         // แสดง loading
         $("logout-btn").disabled = true;
-        $("logout-btn").innerHTML = '<span>⏳</span><span>กำลังออกจากระบบ...</span>';
-        
+        $("logout-btn").innerHTML =
+          "<span>⏳</span><span>กำลังออกจากระบบ...</span>";
+
         google.script.run
           .withSuccessHandler((result) => {
             if (result.success) {
               // แสดงข้อความสำเร็จ
-              alert("✅ " + result.message + "\n\nกำลังกลับไปหน้า Dashboard...");
+              alert(
+                "✅ " + result.message + "\n\nกำลังกลับไปหน้า Dashboard..."
+              );
               // ใช้ top.window เพื่อ navigate ทั้ง page
               top.window.location.href = result.redirectUrl;
             } else {
               alert("❌ " + result.message);
               $("logout-btn").disabled = false;
-              $("logout-btn").innerHTML = '<span>🚪</span><span>ออกจากระบบ</span>';
+              $("logout-btn").innerHTML =
+                "<span>🚪</span><span>ออกจากระบบ</span>";
             }
           })
           .withFailureHandler((err) => {
             alert("❌ เกิดข้อผิดพลาด: " + err.message);
             $("logout-btn").disabled = false;
-            $("logout-btn").innerHTML = '<span>🚪</span><span>ออกจากระบบ</span>';
+            $("logout-btn").innerHTML =
+              "<span>🚪</span><span>ออกจากระบบ</span>";
           })
           .logout(sessionId);
       }
@@ -240,11 +269,11 @@
       form.reset();
       delete form.dataset.editIndex;
       delete form.dataset.editMode;
-      
+
       // เปิดฟิลด์ชื่อ นามสกุล กลับมา (สำหรับเพิ่มใหม่)
       const fnameInput = form.querySelector(`[name="ชื่อ"]`);
       const lnameInput = form.querySelector(`[name="นามสกุล"]`);
-      
+
       if (fnameInput) {
         fnameInput.readOnly = false;
         fnameInput.style.backgroundColor = "";
@@ -255,20 +284,20 @@
         lnameInput.style.backgroundColor = "";
         lnameInput.style.cursor = "";
       }
-      
+
       const submitBtn = form.querySelector('button[type="submit"]');
-      submitBtn.innerHTML = '<span>💾</span><span>บันทึก</span>';
+      submitBtn.innerHTML = "<span>💾</span><span>บันทึก</span>";
       submitBtn.style.background = "";
-      
+
       // เปลี่ยน header กลับมา
       const modalHeader = modal.querySelector(".modal-header h2");
       if (modalHeader) {
         modalHeader.textContent = "➕ เพิ่มรายการใหม่";
       }
-      
+
       modal.classList.add("show");
     };
-    
+
     $("close-add-record").onclick = closeAddRecordModal;
     $("cancel-add-record").onclick = closeAddRecordModal;
 
@@ -278,11 +307,11 @@
       alert.className = "alert";
       delete form.dataset.editIndex;
       delete form.dataset.editMode;
-      
+
       // เปิดฟิลด์ชื่อ นามสกุล กลับมา
       const fnameInput = form.querySelector(`[name="ชื่อ"]`);
       const lnameInput = form.querySelector(`[name="นามสกุล"]`);
-      
+
       if (fnameInput) {
         fnameInput.readOnly = false;
         fnameInput.style.backgroundColor = "";
@@ -293,11 +322,11 @@
         lnameInput.style.backgroundColor = "";
         lnameInput.style.cursor = "";
       }
-      
+
       const submitBtn = form.querySelector('button[type="submit"]');
-      submitBtn.innerHTML = '<span>💾</span><span>บันทึก</span>';
+      submitBtn.innerHTML = "<span>💾</span><span>บันทึก</span>";
       submitBtn.style.background = "";
-      
+
       // เปลี่ยน header กลับมา
       const modalHeader = modal.querySelector(".modal-header h2");
       if (modalHeader) {
@@ -315,13 +344,17 @@
       const isEditMode = form.dataset.editMode === "true";
       const editIndex = parseInt(form.dataset.editIndex);
 
-      showAlert(alert, isEditMode ? "กำลังบันทึกการแก้ไข..." : "กำลังบันทึก...", "");
+      showAlert(
+        alert,
+        isEditMode ? "กำลังบันทึกการแก้ไข..." : "กำลังบันทึก...",
+        ""
+      );
       $("submit-record").disabled = true;
 
       if (isEditMode && !isNaN(editIndex)) {
         // โหมดแก้ไข - อัปเดตข้อมูลด้วย UUID
         const uuid = form.dataset.editUuid;
-        
+
         if (!uuid) {
           showAlert(alert, "❌ ไม่พบ UUID ของข้อมูล", "error");
           $("submit-record").disabled = false;
@@ -472,11 +505,7 @@
         google.script.run
           .withSuccessHandler((result) => {
             if (result.success) {
-              showAlert(
-                alert,
-                `✅ ${result.message}`,
-                "success"
-              );
+              showAlert(alert, `✅ ${result.message}`, "success");
             } else {
               showAlert(alert, "❌ " + result.message, "error");
             }
@@ -514,18 +543,22 @@
     if (!exportBtn) return;
 
     exportBtn.onclick = () => {
-      if (!confirm("ต้องการส่งออกข้อมูลทั้งหมดของอำเภอนี้หรือไม่?\n\nไฟล์ที่ส่งออกจะมี UUID สำหรับการนำเข้าครั้งต่อไป")) {
+      if (
+        !confirm(
+          "ต้องการส่งออกข้อมูลทั้งหมดของอำเภอนี้หรือไม่?\n\nไฟล์ที่ส่งออกจะมี UUID สำหรับการนำเข้าครั้งต่อไป"
+        )
+      ) {
         return;
       }
 
       exportBtn.disabled = true;
-      exportBtn.innerHTML = '<span>⏳</span><span>กำลังส่งออก...</span>';
+      exportBtn.innerHTML = "<span>⏳</span><span>กำลังส่งออก...</span>";
 
-      const sessionId = localStorage.getItem('ncd_session_id');
+      const sessionId = localStorage.getItem("ncd_session_id");
       google.script.run
         .withSuccessHandler((result) => {
           exportBtn.disabled = false;
-          exportBtn.innerHTML = '<span>📤</span><span>ส่งออกข้อมูล</span>';
+          exportBtn.innerHTML = "<span>📤</span><span>ส่งออกข้อมูล</span>";
 
           if (result.success) {
             alert("✅ " + result.message + "\n\nกำลังเปิดไฟล์...");
@@ -536,7 +569,7 @@
         })
         .withFailureHandler((err) => {
           exportBtn.disabled = false;
-          exportBtn.innerHTML = '<span>📤</span><span>ส่งออกข้อมูล</span>';
+          exportBtn.innerHTML = "<span>📤</span><span>ส่งออกข้อมูล</span>";
           alert("❌ เกิดข้อผิดพลาด: " + err.message);
         })
         .exportDataWithUuid(sessionId);
@@ -550,6 +583,7 @@
     id: "id",
     fname: "ชื่อ",
     lname: "นามสกุล",
+    gender: "เพศ",
     village: "ชื่อหมู่บ้าน",
     houseNo: "บ้านเลขที่",
     province: "จังหวัด",
@@ -570,20 +604,20 @@
 
   let state = {
     raw: [],
-    filtered: []
+    filtered: [],
   };
 
   function loadData() {
     google.script.run
       .withSuccessHandler((result) => {
         console.log("Loaded data:", result);
-        
+
         if (result.error) {
           console.error("Error from server:", result.error);
           alert("❌ " + result.error);
           return;
         }
-        
+
         if (result.data && Array.isArray(result.data)) {
           state.raw = result.data.map((x) => normalize(x));
           state.filtered = state.raw;
@@ -624,12 +658,12 @@
 
     if (state.filtered.length === 0) {
       const tr = document.createElement("tr");
-      const msg = !userAmphoe 
-        ? "ไม่พบข้อมูลอำเภอ - กรุณาตรวจสอบชีท user" 
+      const msg = !userAmphoe
+        ? "ไม่พบข้อมูลอำเภอ - กรุณาตรวจสอบชีท user"
         : `ไม่มีข้อมูลสำหรับอำเภอ "${userAmphoe}"`;
-      tr.innerHTML = `<td colspan="20" style="text-align: center; padding: 2rem; color: var(--text-secondary);">${msg}</td>`;
+      tr.innerHTML = `<td colspan="21" style="text-align: center; padding: 2rem; color: var(--text-secondary);">${msg}</td>`;
       tbody.appendChild(tr);
-      
+
       // อัปเดตจำนวนรายการ
       const totalElement = document.getElementById("total");
       if (totalElement) {
@@ -644,6 +678,7 @@
         <td>${idx + 1}</td>
         <td>${row[COL.fname] || ""}</td>
         <td>${row[COL.lname] || ""}</td>
+        <td>${row[COL.gender] || ""}</td>
         <td>${row[COL.village] || ""}</td>
         <td>${row[COL.houseNo] || ""}</td>
         <td>${row[COL.province] || ""}</td>
@@ -697,17 +732,27 @@
 
     tbody.addEventListener("click", (e) => {
       const target = e.target;
-      
+
       // ปุ่มแก้ไข
-      if (target.classList.contains("btn-edit") || target.closest(".btn-edit")) {
-        const btn = target.classList.contains("btn-edit") ? target : target.closest(".btn-edit");
+      if (
+        target.classList.contains("btn-edit") ||
+        target.closest(".btn-edit")
+      ) {
+        const btn = target.classList.contains("btn-edit")
+          ? target
+          : target.closest(".btn-edit");
         const idx = parseInt(btn.dataset.index);
         editRecord(idx);
       }
-      
+
       // ปุ่มลบ
-      if (target.classList.contains("btn-delete") || target.closest(".btn-delete")) {
-        const btn = target.classList.contains("btn-delete") ? target : target.closest(".btn-delete");
+      if (
+        target.classList.contains("btn-delete") ||
+        target.closest(".btn-delete")
+      ) {
+        const btn = target.classList.contains("btn-delete")
+          ? target
+          : target.closest(".btn-delete");
         const idx = parseInt(btn.dataset.index);
         deleteRecord(idx);
       }
@@ -728,7 +773,7 @@
 
     // เติมข้อมูลในฟอร์มโดยใช้ name attribute
     const form = $("record-form");
-    
+
     // ฟังก์ชันช่วยเซตค่า โดยหา input จาก name
     const setValue = (name, value) => {
       const input = form.querySelector(`[name="${name}"]`);
@@ -740,6 +785,7 @@
     // เติมข้อมูลทุกฟิลด์ตาม COL
     setValue(COL.fname, row[COL.fname]);
     setValue(COL.lname, row[COL.lname]);
+    setValue(COL.gender, row[COL.gender]);
     setValue(COL.village, row[COL.village]);
     setValue(COL.houseNo, row[COL.houseNo]);
     setValue(COL.province, row[COL.province]);
@@ -761,7 +807,7 @@
     const fnameInput = form.querySelector(`[name="${COL.fname}"]`);
     const lnameInput = form.querySelector(`[name="${COL.lname}"]`);
     const amphoeInput = form.querySelector(`[name="${COL.amphoe}"]`);
-    
+
     if (fnameInput) {
       fnameInput.readOnly = true;
       fnameInput.style.backgroundColor = "var(--bg-secondary)";
@@ -780,7 +826,7 @@
 
     // เปลี่ยนปุ่มเป็น "บันทึกการแก้ไข"
     const submitBtn = form.querySelector('button[type="submit"]');
-    submitBtn.innerHTML = '<span>💾</span><span>บันทึกการแก้ไข</span>';
+    submitBtn.innerHTML = "<span>💾</span><span>บันทึกการแก้ไข</span>";
     submitBtn.style.background = "#f59e0b";
 
     // เปลี่ยน header
@@ -809,8 +855,12 @@
     }
 
     const name = `${row[COL.fname] || ""} ${row[COL.lname] || ""}`.trim();
-    
-    if (!confirm(`คุณต้องการลบข้อมูลของ "${name}" หรือไม่?\n\n⚠️ การลบจะไม่สามารถย้อนกลับได้`)) {
+
+    if (
+      !confirm(
+        `คุณต้องการลบข้อมูลของ "${name}" หรือไม่?\n\n⚠️ การลบจะไม่สามารถย้อนกลับได้`
+      )
+    ) {
       return;
     }
 
@@ -823,7 +873,7 @@
     }
 
     // เรียก API ลบข้อมูลด้วย UUID
-    const sessionId = localStorage.getItem('ncd_session_id');
+    const sessionId = localStorage.getItem("ncd_session_id");
     google.script.run
       .withSuccessHandler((result) => {
         if (loadingIndicator) {
