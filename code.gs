@@ -46,7 +46,10 @@ function doGet(e) {
     if (action === "getData") {
       return ContentService.createTextOutput(
         JSON.stringify(getDataObj())
-      ).setMimeType(ContentService.MimeType.JSON);
+      ).setMimeType(ContentService.MimeType.JSON)
+       .setHeader('Access-Control-Allow-Origin', '*')
+       .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+       .setHeader('Access-Control-Allow-Headers', 'Content-Type');
     }
 
     // ถ้าเรียก admin panel ต้องเช็ค session
@@ -85,6 +88,15 @@ function doGet(e) {
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   } catch (error) {
     Logger.log("Error in doGet: " + error.toString());
+    // ถ้าเป็น API request ให้ส่ง JSON error กลับไป
+    if (e && e.parameter && e.parameter.action) {
+      return ContentService.createTextOutput(
+        JSON.stringify({ success: false, error: error.toString() })
+      ).setMimeType(ContentService.MimeType.JSON)
+       .setHeader('Access-Control-Allow-Origin', '*')
+       .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+       .setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    }
     // ถ้าเกิด error ให้ไปหน้า session expired
     return HtmlService.createTemplateFromFile("SessionExpired")
       .evaluate()
@@ -105,32 +117,47 @@ function doPost(e) {
 
       return ContentService.createTextOutput(
         JSON.stringify(result)
-      ).setMimeType(ContentService.MimeType.JSON);
+      ).setMimeType(ContentService.MimeType.JSON)
+       .setHeader('Access-Control-Allow-Origin', '*')
+       .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+       .setHeader('Access-Control-Allow-Headers', 'Content-Type');
     }
 
     if (action === "logout") {
       const result = logout();
       return ContentService.createTextOutput(
         JSON.stringify(result)
-      ).setMimeType(ContentService.MimeType.JSON);
+      ).setMimeType(ContentService.MimeType.JSON)
+       .setHeader('Access-Control-Allow-Origin', '*')
+       .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+       .setHeader('Access-Control-Allow-Headers', 'Content-Type');
     }
 
     if (action === "checkSession") {
       const result = checkSession();
       return ContentService.createTextOutput(
         JSON.stringify(result)
-      ).setMimeType(ContentService.MimeType.JSON);
+      ).setMimeType(ContentService.MimeType.JSON)
+       .setHeader('Access-Control-Allow-Origin', '*')
+       .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+       .setHeader('Access-Control-Allow-Headers', 'Content-Type');
     }
 
     return ContentService.createTextOutput(
       JSON.stringify({ success: false, error: "Invalid action" })
-    ).setMimeType(ContentService.MimeType.JSON);
+    ).setMimeType(ContentService.MimeType.JSON)
+     .setHeader('Access-Control-Allow-Origin', '*')
+     .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+     .setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   } catch (error) {
     Logger.log("Error in doPost: " + error.toString());
     return ContentService.createTextOutput(
       JSON.stringify({ success: false, error: error.toString() })
-    ).setMimeType(ContentService.MimeType.JSON);
+    ).setMimeType(ContentService.MimeType.JSON)
+     .setHeader('Access-Control-Allow-Origin', '*')
+     .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+     .setHeader('Access-Control-Allow-Headers', 'Content-Type');
   }
 }
 

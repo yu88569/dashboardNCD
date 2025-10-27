@@ -2,7 +2,7 @@
  Configuration & State
  ============================================ */
 const API_URL =
-  "https://script.google.com/macros/s/AKfycbyuGq-BKxBQWIklTP67oWb9um_fcAny-PpFqlaVWHM7vn_oX2MPdri-UdXML2idpyjn/exec";
+  "https://script.google.com/macros/s/AKfycbzL-GA4g93TClmSOwuW2zO5f2eGjqmOGMNGe476GgobHCE4tn14r46u4Ts8-yJSktdS/exec";
 
 const COL = {
   fname: "ชื่อ",
