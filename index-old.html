@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>📊 NCDs Dashboard - ระบบติดตาม NCDs</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+
+    <?!= HtmlService.createHtmlOutputFromFile('Styles').getContent(); ?>
+  </head>
+  <body>
+    <?!= HtmlService.createHtmlOutputFromFile('Header').getContent(); ?>
+
+    <?!= HtmlService.createHtmlOutputFromFile('Kpis').getContent(); ?>
+
+    <?!= HtmlService.createHtmlOutputFromFile('Charts').getContent(); ?>
+
+    <?!= HtmlService.createHtmlOutputFromFile('Modals').getContent(); ?>
+
+    <?!= HtmlService.createHtmlOutputFromFile('Scripts').getContent(); ?>
+  </body>
+</html>

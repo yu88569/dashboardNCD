@@ -1,22 +1,92 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>📊 NCDs Dashboard - ระบบติดตาม NCDs</title>
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="0; url=./docs/">
+    <title>Redirecting... | NCDs Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    <?!= HtmlService.createHtmlOutputFromFile('Styles').getContent(); ?>
-  </head>
-  <body>
-    <?!= HtmlService.createHtmlOutputFromFile('Header').getContent(); ?>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: white;
+        }
 
-    <?!= HtmlService.createHtmlOutputFromFile('Kpis').getContent(); ?>
+        .container {
+            text-align: center;
+            padding: 2rem;
+            max-width: 500px;
+        }
 
-    <?!= HtmlService.createHtmlOutputFromFile('Charts').getContent(); ?>
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 2rem;
+        }
 
-    <?!= HtmlService.createHtmlOutputFromFile('Modals').getContent(); ?>
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
 
-    <?!= HtmlService.createHtmlOutputFromFile('Scripts').getContent(); ?>
-  </body>
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        p {
+            font-size: 1rem;
+            opacity: 0.9;
+            margin-bottom: 1.5rem;
+        }
+
+        a {
+            color: white;
+            text-decoration: underline;
+            font-weight: 500;
+            transition: opacity 0.2s;
+        }
+
+        a:hover {
+            opacity: 0.8;
+        }
+
+        .icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">📊</div>
+        <div class="spinner"></div>
+        <h1>กำลังเปลี่ยนเส้นทาง...</h1>
+        <p>กำลังนำคุณไปยัง NCDs Dashboard</p>
+        <p>
+            <small>หากไม่เปลี่ยนหน้าอัตโนมัติ กรุณา</p> <a href="./docs/">คลิกที่นี่</a></small>
+        </p>
+    </div>
+
+    <script>
+        // Redirect after 0 seconds (instant)
+        setTimeout(() => {
+            window.location.href = './docs/';
+        }, 0);
+    </script>
+</body>
 </html>
