@@ -1,7 +1,8 @@
 /* ============================================
  Configuration & State
  ============================================ */
-const API_URL = 'https://script.google.com/macros/s/YOUR_APPS_SCRIPT_DEPLOYMENT_ID/exec';
+const API_URL =
+  "https://script.google.com/macros/s/AKfycbyuGq-BKxBQWIklTP67oWb9um_fcAny-PpFqlaVWHM7vn_oX2MPdri-UdXML2idpyjn/exec";
 
 const COL = {
   fname: "ชื่อ",
@@ -93,10 +94,10 @@ async function loadData() {
       computeOptions();
       applyFilters();
     } else {
-      throw new Error(result.error || 'ไม่สามารถโหลดข้อมูลได้');
+      throw new Error(result.error || "ไม่สามารถโหลดข้อมูลได้");
     }
   } catch (err) {
-    console.error('Error loading data:', err);
+    console.error("Error loading data:", err);
     alert("โหลดข้อมูลไม่สำเร็จ: " + err.message);
   }
 }
@@ -118,7 +119,7 @@ function normalize(x) {
 function computeOptions() {
   const uniq = (arr) =>
     Array.from(new Set(arr.filter(Boolean))).sort((a, b) =>
-      a.localeCompare(b, "th")
+      a.localeCompare(b, "th"),
     );
   state.options.province = uniq(state.raw.map((r) => r[COL.province]));
   state.options.amphoe = uniq(state.raw.map((r) => r[COL.amphoe]));
@@ -153,7 +154,7 @@ function applyFilters() {
       (!f.amphoe || r[COL.amphoe] === f.amphoe) &&
       (!f.tambon || r[COL.tambon] === f.tambon) &&
       (!f.status || r[COL.status] === f.status) &&
-      (!f.gender || r[COL.gender] === f.gender)
+      (!f.gender || r[COL.gender] === f.gender),
   );
 
   renderKpis();
@@ -166,21 +167,17 @@ function applyFilters() {
 function renderKpis() {
   const total = state.filtered.length;
   const ncdRisk = state.filtered.filter((r) =>
-    includesThaiRisk(r[COL.ncd])
+    includesThaiRisk(r[COL.ncd]),
   ).length;
   const ncdOk = state.filtered.filter((r) => isThaiNormal(r[COL.ncd])).length;
   const finished = state.filtered.filter((r) =>
-    (r[COL.status] || "").includes("เสร็จสิ้น")
+    (r[COL.status] || "").includes("เสร็จสิ้น"),
   ).length;
 
   // Gender counts
   const male = state.filtered.filter((r) => r[COL.gender] === "ชาย").length;
-  const female = state.filtered.filter(
-    (r) => r[COL.gender] === "หญิง"
-  ).length;
-  const monk = state.filtered.filter(
-    (r) => r[COL.gender] === "พระสงฆ์"
-  ).length;
+  const female = state.filtered.filter((r) => r[COL.gender] === "หญิง").length;
+  const monk = state.filtered.filter((r) => r[COL.gender] === "พระสงฆ์").length;
 
   if ($("kpi-total")) $("kpi-total").textContent = total;
   if ($("kpi-risk")) $("kpi-risk").textContent = ncdRisk;
@@ -194,10 +191,10 @@ function renderKpis() {
 
   // ภาพรวมการประเมิน
   const normalCount = state.filtered.filter((r) =>
-    isThaiNormal(r[COL.ncd])
+    isThaiNormal(r[COL.ncd]),
   ).length;
   const riskCount = state.filtered.filter((r) =>
-    includesThaiRisk(r[COL.ncd])
+    includesThaiRisk(r[COL.ncd]),
   ).length;
   const sickCount = total - normalCount - riskCount;
 
@@ -225,18 +222,18 @@ function renderKpis() {
   // ข้อมูลตามประเภท
   const smokeData = state.filtered.map((r) => norm(r[COL.smoke]));
   const smokeNormal = smokeData.filter(
-    (s) => s.includes("ไม่สูบ") || s === "ไม่สูบ"
+    (s) => s.includes("ไม่สูบ") || s === "ไม่สูบ",
   ).length;
   const smokeRisk = smokeData.filter(
-    (s) => s.includes("สูบ") && !s.includes("ไม่สูบ")
+    (s) => s.includes("สูบ") && !s.includes("ไม่สูบ"),
   ).length;
 
   const alcoholData = state.filtered.map((r) => norm(r[COL.alcohol]));
   const alcoholNormal = alcoholData.filter(
-    (s) => s.includes("ไม่ดื่ม") || s === "ไม่ดื่ม"
+    (s) => s.includes("ไม่ดื่ม") || s === "ไม่ดื่ม",
   ).length;
   const alcoholRisk = alcoholData.filter(
-    (s) => s.includes("ดื่ม") && !s.includes("ไม่ดื่ม")
+    (s) => s.includes("ดื่ม") && !s.includes("ไม่ดื่ม"),
   ).length;
 
   const mentalData = state.filtered.map((r) => norm(r[COL.mental]));
@@ -300,8 +297,7 @@ function drawCharts() {
     normal.push(group.filter(isThaiNormal).length);
     risk.push(group.filter(includesThaiRisk).length);
     other.push(
-      group.filter((s) => s && !isThaiNormal(s) && !includesThaiRisk(s))
-        .length
+      group.filter((s) => s && !isThaiNormal(s) && !includesThaiRisk(s)).length,
     );
   });
   window.chFactors.setOption({
@@ -332,9 +328,7 @@ function drawCharts() {
   });
 
   // 2) Top ตำบล
-  const tb = Object.entries(
-    countBy(state.filtered, (r) => norm(r[COL.tambon]))
-  )
+  const tb = Object.entries(countBy(state.filtered, (r) => norm(r[COL.tambon])))
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10);
   window.chTambon.setOption({
@@ -540,15 +534,15 @@ function initModals() {
 
       try {
         const response = await fetch(API_URL, {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
+            "Content-Type": "application/x-www-form-urlencoded",
           },
           body: new URLSearchParams({
-            action: 'login',
+            action: "login",
             username: username,
-            password: password
-          })
+            password: password,
+          }),
         });
 
         const result = await response.json();
@@ -557,12 +551,15 @@ function initModals() {
           alert("✅ เข้าสู่ระบบสำเร็จ!");
           loginModal.style.display = "none";
           // Redirect to admin page or update UI
-          window.location.href = result.redirectUrl || 'admin.html';
+          window.location.href = result.redirectUrl || "admin.html";
         } else {
-          alert("❌ เข้าสู่ระบบไม่สำเร็จ: " + (result.error || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'));
+          alert(
+            "❌ เข้าสู่ระบบไม่สำเร็จ: " +
+              (result.error || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"),
+          );
         }
       } catch (err) {
-        console.error('Login error:', err);
+        console.error("Login error:", err);
         alert("❌ เกิดข้อผิดพลาด: " + err.message);
       }
     };
