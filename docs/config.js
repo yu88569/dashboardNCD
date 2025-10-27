@@ -17,17 +17,18 @@ const CONFIG = {
    *
    * ตัวอย่าง: 'https://script.google.com/macros/s/AKfycbxXXXXXXXXXXXXXXXXX/exec'
    */
-  API_URL: 'https://script.google.com/macros/s/YOUR_APPS_SCRIPT_DEPLOYMENT_ID/exec',
+  API_URL:
+    "https://script.google.com/macros/s/AKfycbzL-GA4g93TClmSOwuW2zO5f2eGjqmOGMNGe476GgobHCE4tn14r46u4Ts8-yJSktdS/exec",
 
   /**
    * ชื่อแอปพลิเคชัน
    */
-  APP_NAME: 'NCDs Dashboard',
+  APP_NAME: "NCDs Dashboard",
 
   /**
    * เวอร์ชัน
    */
-  VERSION: '1.0.0',
+  VERSION: "1.0.0",
 
   /**
    * การตั้งค่า Cache
@@ -37,7 +38,7 @@ const CONFIG = {
     TTL_SECONDS: 300,
 
     // เปิด/ปิดการใช้งาน cache
-    ENABLED: true
+    ENABLED: true,
   },
 
   /**
@@ -45,10 +46,10 @@ const CONFIG = {
    */
   THEME: {
     // Theme เริ่มต้น: 'dark' หรือ 'light'
-    DEFAULT: 'dark',
+    DEFAULT: "dark",
 
     // บันทึก theme preference ใน localStorage
-    SAVE_PREFERENCE: true
+    SAVE_PREFERENCE: true,
   },
 
   /**
@@ -59,7 +60,7 @@ const CONFIG = {
     MAX_ROWS: 200,
 
     // เปิด/ปิดการแสดงตาราง
-    SHOW_TABLE: false
+    SHOW_TABLE: false,
   },
 
   /**
@@ -73,7 +74,7 @@ const CONFIG = {
     DEFAULT_HEIGHT: 320,
 
     // Animation duration (milliseconds)
-    ANIMATION_DURATION: 750
+    ANIMATION_DURATION: 750,
   },
 
   /**
@@ -87,7 +88,7 @@ const CONFIG = {
     RETRY_COUNT: 3,
 
     // Retry delay (milliseconds)
-    RETRY_DELAY: 1000
+    RETRY_DELAY: 1000,
   },
 
   /**
@@ -101,7 +102,7 @@ const CONFIG = {
     LOG_API_RESPONSE: false,
 
     // แสดง error stack trace
-    LOG_ERRORS: true
+    LOG_ERRORS: true,
   },
 
   /**
@@ -126,7 +127,7 @@ const CONFIG = {
     ALCOHOL: "แอลกอฮอล์",
     STATUS: "สถานะ",
     REFER: "ส่งต่อหน่วยบริการ",
-    REFER_CODE: "รหัสหน่วยบริการที่ส่งออก"
+    REFER_CODE: "รหัสหน่วยบริการที่ส่งออก",
   },
 
   /**
@@ -140,7 +141,7 @@ const CONFIG = {
     MALE: "ชาย",
     FEMALE: "หญิง",
     MONK: "พระสงฆ์",
-    ALL: "ทั้งหมด"
+    ALL: "ทั้งหมด",
   },
 
   /**
@@ -153,16 +154,16 @@ const CONFIG = {
     MALE: "#89cff0",
     FEMALE: "#ffb6c1",
     MONK: "#ffd700",
-    PRIMARY: "#4c74ff"
-  }
+    PRIMARY: "#4c74ff",
+  },
 };
 
 // Export configuration (ถ้าใช้ modules)
-if (typeof module !== 'undefined' && module.exports) {
+if (typeof module !== "undefined" && module.exports) {
   module.exports = CONFIG;
 }
 
 // Make available globally
-if (typeof window !== 'undefined') {
+if (typeof window !== "undefined") {
   window.APP_CONFIG = CONFIG;
 }
