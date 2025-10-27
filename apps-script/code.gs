@@ -134,7 +134,79 @@ function doPost(e) {
     }
 
     if (action === "checkSession") {
-      const result = checkSession();
+      const sessionId = e.parameter.sessionId;
+      const result = sessionId ? checkSessionById(sessionId) : checkSession();
+      return ContentService.createTextOutput(
+        JSON.stringify(result)
+      ).setMimeType(ContentService.MimeType.JSON)
+       .setHeader('Access-Control-Allow-Origin', '*')
+       .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+       .setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    }
+
+    if (action === "getAdminData") {
+      const sessionId = e.parameter.sessionId;
+      const result = getAdminDataObj(sessionId);
+      return ContentService.createTextOutput(
+        JSON.stringify(result)
+      ).setMimeType(ContentService.MimeType.JSON)
+       .setHeader('Access-Control-Allow-Origin', '*')
+       .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+       .setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    }
+
+    if (action === "addRecord") {
+      const sessionId = e.parameter.sessionId;
+      const data = JSON.parse(e.parameter.data || "{}");
+      const result = addRecord(data, sessionId);
+      return ContentService.createTextOutput(
+        JSON.stringify(result)
+      ).setMimeType(ContentService.MimeType.JSON)
+       .setHeader('Access-Control-Allow-Origin', '*')
+       .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+       .setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    }
+
+    if (action === "updateRecord") {
+      const sessionId = e.parameter.sessionId;
+      const rowIndex = parseInt(e.parameter.rowIndex);
+      const data = JSON.parse(e.parameter.data || "{}");
+      const result = updateRecord(rowIndex, data, sessionId);
+      return ContentService.createTextOutput(
+        JSON.stringify(result)
+      ).setMimeType(ContentService.MimeType.JSON)
+       .setHeader('Access-Control-Allow-Origin', '*')
+       .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+       .setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    }
+
+    if (action === "deleteRecord") {
+      const sessionId = e.parameter.sessionId;
+      const rowIndex = parseInt(e.parameter.rowIndex);
+      const result = deleteRecord(rowIndex, sessionId);
+      return ContentService.createTextOutput(
+        JSON.stringify(result)
+      ).setMimeType(ContentService.MimeType.JSON)
+       .setHeader('Access-Control-Allow-Origin', '*')
+       .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+       .setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    }
+
+    if (action === "importCSV") {
+      const sessionId = e.parameter.sessionId;
+      const csvData = e.parameter.csvData;
+      const result = importCSV(csvData, sessionId);
+      return ContentService.createTextOutput(
+        JSON.stringify(result)
+      ).setMimeType(ContentService.MimeType.JSON)
+       .setHeader('Access-Control-Allow-Origin', '*')
+       .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+       .setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    }
+
+    if (action === "exportToSheets") {
+      const sessionId = e.parameter.sessionId;
+      const result = exportToSheets(sessionId);
       return ContentService.createTextOutput(
         JSON.stringify(result)
       ).setMimeType(ContentService.MimeType.JSON)
@@ -144,7 +216,7 @@ function doPost(e) {
     }
 
     return ContentService.createTextOutput(
-      JSON.stringify({ success: false, error: "Invalid action" })
+      JSON.stringify({ success: false, error: "Invalid action: " + action })
     ).setMimeType(ContentService.MimeType.JSON)
      .setHeader('Access-Control-Allow-Origin', '*')
      .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -289,9 +361,10 @@ function login(username, password) {
         success: true,
         message: "เข้าสู่ระบบสำเร็จ",
         sessionId: sessionId,
-        username: username,
-        amphoe: amphoe,
-        redirectUrl: ScriptApp.getService().getUrl() + "?page=admin"
+        user: {
+          username: username,
+          amphoe: amphoe
+        }
       };
     } else {
       return { success: false, message: "username หรือ password ไม่ถูกต้อง" };
@@ -376,6 +449,7 @@ function checkSession(sessionId) {
     const session = sessionId ? getSessionById_(sessionId) : getSession();
     if (session) {
       return {
+        valid: true,
         success: true,
         username: session.username || "",
         amphoe: session.amphoe || "",
@@ -383,12 +457,58 @@ function checkSession(sessionId) {
       };
     }
     return {
+      valid: false,
       success: false,
       message: "ไม่พบ session"
     };
   } catch (error) {
     Logger.log("Error in checkSession: " + error.toString());
     return {
+      valid: false,
+      success: false,
+      message: "เกิดข้อผิดพลาด: " + error.toString()
+    };
+  }
+}
+
+/** ====== CHECK SESSION BY ID (for REST API) ====== **/
+function checkSessionById(sessionId) {
+  try {
+    if (!sessionId) {
+      return { valid: false, success: false, message: "No session ID provided" };
+    }
+
+    const session = getSessionById_(sessionId);
+    if (!session) {
+      return { valid: false, success: false, message: "Session not found" };
+    }
+
+    // ตรวจสอบว่า session หมดอายุหรือไม่ (24 ชั่วโมง)
+    if (session.loginTime) {
+      const now = new Date().getTime();
+      const login = parseInt(session.loginTime);
+
+      if (!isNaN(login)) {
+        const hoursPassed = (now - login) / (1000 * 60 * 60);
+
+        if (hoursPassed > 24) {
+          clearSessionById_(sessionId);
+          return { valid: false, success: false, message: "Session expired" };
+        }
+      }
+    }
+
+    return {
+      valid: true,
+      success: true,
+      username: session.username || "",
+      amphoe: session.amphoe || "",
+      loginTime: session.loginTime
+    };
+  } catch (error) {
+    Logger.log("Error in checkSessionById: " + error.toString());
+    return {
+      valid: false,
       success: false,
       message: "เกิดข้อผิดพลาด: " + error.toString()
     };
@@ -419,7 +539,12 @@ function getDataObj() {
 /** ====== SERVER: RETURN DATA FOR ADMIN (FILTERED BY AMPHOE) ====== **/
 function getAdminDataObj(sessionId) {
   try {
-    const session = sessionId ? getSessionById_(sessionId) : getSession();
+    // Check session first
+    if (!sessionId) {
+      return { success: false, message: "No session ID provided", data: [] };
+    }
+
+    const session = getSessionById_(sessionId);
     if (!session) {
       Logger.log("No session found");
       return { data: [], updatedAt: new Date(), error: "ไม่ได้ล็อกอิน" };
@@ -467,7 +592,243 @@ function getAdminDataObj(sessionId) {
     return result;
   } catch (error) {
     Logger.log("Error in getAdminDataObj: " + error.toString());
-    return { data: [], updatedAt: new Date(), error: error.toString() };
+    return { success: false, message: error.toString(), data: [], updatedAt: new Date() };
+  }
+}
+
+/** ====== ADD NEW RECORD (REST API) ====== **/
+function addRecord(recordData, sessionId) {
+  try {
+    // Check session
+    if (!sessionId) {
+      return { success: false, message: "No session ID provided" };
+    }
+
+    const session = getSessionById_(sessionId);
+    if (!session) {
+      return { success: false, message: "Session not found or expired" };
+    }
+
+    const adminAmphoe = session.amphoe;
+    if (!adminAmphoe) {
+      return { success: false, message: "No amphoe assigned to admin" };
+    }
+
+    // Ensure UUID column exists
+    ensureUuidColumn();
+
+    const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
+    const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+
+    // Auto-fill amphoe if not provided
+    if (!recordData["อำเภอ"]) {
+      recordData["อำเภอ"] = adminAmphoe;
+    }
+
+    // Verify amphoe matches admin's amphoe
+    if (recordData["อำเภอ"] !== adminAmphoe) {
+      return { success: false, message: "Cannot add record to different amphoe" };
+    }
+
+    // Generate UUID
+    const uuid = Utilities.getUuid();
+    recordData["uuid"] = uuid;
+
+    // Build row data
+    const newRow = headers.map(h => recordData[String(h).trim()] || "");
+
+    // Append to sheet
+    sh.appendRow(newRow);
+
+    // Clear cache
+    CacheService.getScriptCache().remove("rows");
+
+    return {
+      success: true,
+      message: "เพิ่มรายการสำเร็จ",
+      uuid: uuid
+    };
+  } catch (error) {
+    Logger.log("Error in addRecord: " + error.toString());
+    return {
+      success: false,
+      message: "เกิดข้อผิดพลาด: " + error.toString()
+    };
+  }
+}
+
+/** ====== IMPORT CSV DATA (REST API) ====== **/
+function importCSV(csvData, sessionId) {
+  try {
+    // Check session
+    if (!sessionId) {
+      return { success: false, message: "No session ID provided" };
+    }
+
+    const session = getSessionById_(sessionId);
+    if (!session) {
+      return { success: false, message: "Session not found or expired" };
+    }
+
+    const adminAmphoe = session.amphoe;
+    if (!adminAmphoe) {
+      return { success: false, message: "No amphoe assigned to admin" };
+    }
+
+    if (!csvData) {
+      return { success: false, message: "No CSV data provided" };
+    }
+
+    // Parse CSV
+    const lines = csvData.split("\n").filter(line => line.trim());
+    if (lines.length < 2) {
+      return { success: false, message: "CSV file is empty or invalid" };
+    }
+
+    const csvHeaders = lines[0].split(",").map(h => h.trim().replace(/['"]/g, ""));
+    const dataRows = lines.slice(1);
+
+    // Ensure UUID column exists
+    ensureUuidColumn();
+
+    const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
+    const sheetHeaders = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+    const amphoeIdx = csvHeaders.findIndex(h => h === "อำเภอ");
+
+    let importedCount = 0;
+    const errors = [];
+
+    dataRows.forEach((line, idx) => {
+      try {
+        const values = line.split(",").map(v => v.trim().replace(/['"]/g, ""));
+
+        // Check amphoe
+        if (amphoeIdx !== -1 && values[amphoeIdx] !== adminAmphoe) {
+          errors.push(`Row ${idx + 2}: Different amphoe (${values[amphoeIdx]})`);
+          return;
+        }
+
+        // Build record object
+        const record = {};
+        csvHeaders.forEach((header, i) => {
+          record[header] = values[i] || "";
+        });
+
+        // Set amphoe if not provided
+        if (!record["อำเภอ"]) {
+          record["อำเภอ"] = adminAmphoe;
+        }
+
+        // Generate UUID
+        record["uuid"] = Utilities.getUuid();
+
+        // Build row
+        const newRow = sheetHeaders.map(h => record[String(h).trim()] || "");
+
+        // Append
+        sh.appendRow(newRow);
+        importedCount++;
+      } catch (rowError) {
+        errors.push(`Row ${idx + 2}: ${rowError.toString()}`);
+      }
+    });
+
+    // Clear cache
+    CacheService.getScriptCache().remove("rows");
+
+    return {
+      success: true,
+      message: `นำเข้าสำเร็จ ${importedCount} รายการ`,
+      count: importedCount,
+      errors: errors.length > 0 ? errors : null
+    };
+  } catch (error) {
+    Logger.log("Error in importCSV: " + error.toString());
+    return {
+      success: false,
+      message: "เกิดข้อผิดพลาด: " + error.toString()
+    };
+  }
+}
+
+/** ====== EXPORT TO GOOGLE SHEETS (REST API) ====== **/
+function exportToSheets(sessionId) {
+  try {
+    // Check session
+    if (!sessionId) {
+      return { success: false, message: "No session ID provided" };
+    }
+
+    const session = getSessionById_(sessionId);
+    if (!session) {
+      return { success: false, message: "Session not found or expired" };
+    }
+
+    const adminAmphoe = session.amphoe;
+    if (!adminAmphoe) {
+      return { success: false, message: "No amphoe assigned to admin" };
+    }
+
+    const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
+    const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+    const amphoeIdx = headers.findIndex(h => String(h).trim() === "อำเภอ");
+
+    // Get all data
+    const lastRow = sh.getLastRow();
+    if (lastRow < 2) {
+      return { success: false, message: "ไม่มีข้อมูลสำหรับส่งออก" };
+    }
+
+    const allData = sh.getRange(2, 1, lastRow - 1, headers.length).getValues();
+
+    // Filter by amphoe
+    const filteredData = allData.filter(row => {
+      if (amphoeIdx !== -1) {
+        return String(row[amphoeIdx]).trim() === adminAmphoe;
+      }
+      return true;
+    });
+
+    if (filteredData.length === 0) {
+      return { success: false, message: "ไม่มีข้อมูลสำหรับอำเภอ " + adminAmphoe };
+    }
+
+    // Create new spreadsheet
+    const timestamp = Utilities.formatDate(new Date(), "GMT+7", "yyyy-MM-dd_HHmmss");
+    const newSS = SpreadsheetApp.create(`NCDs_Export_${adminAmphoe}_${timestamp}`);
+    const newSheet = newSS.getActiveSheet();
+    newSheet.setName("ข้อมูล NCDs");
+
+    // Set headers
+    newSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    newSheet.getRange(1, 1, 1, headers.length).setFontWeight("bold");
+    newSheet.getRange(1, 1, 1, headers.length).setBackground("#4285f4");
+    newSheet.getRange(1, 1, 1, headers.length).setFontColor("#ffffff");
+
+    // Set data
+    if (filteredData.length > 0) {
+      newSheet.getRange(2, 1, filteredData.length, headers.length).setValues(filteredData);
+    }
+
+    // Auto-resize columns
+    for (let i = 1; i <= headers.length; i++) {
+      newSheet.setColumnWidth(i, 120);
+    }
+
+    const url = newSS.getUrl();
+
+    return {
+      success: true,
+      message: "ส่งออกข้อมูลสำเร็จ",
+      url: url,
+      count: filteredData.length
+    };
+  } catch (error) {
+    Logger.log("Error in exportToSheets: " + error.toString());
+    return {
+      success: false,
+      message: "เกิดข้อผิดพลาด: " + error.toString()
+    };
   }
 }
 
