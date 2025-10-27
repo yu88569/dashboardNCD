@@ -40,13 +40,21 @@ function maskName(name) {
 function doGet(e) {
   try {
     const page = e && e.parameter ? e.parameter.page : null;
-    
+    const action = e && e.parameter ? e.parameter.action : null;
+
+    // API endpoint for SPA
+    if (action === "getData") {
+      return ContentService.createTextOutput(
+        JSON.stringify(getDataObj())
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
     // ถ้าเรียก admin panel ต้องเช็ค session
     if (page === "admin") {
       // อ่าน sessionId จาก UserProperties แล้วดึง session จริงจาก ScriptProperties
       const session = getSession();
       Logger.log("doGet admin check - Session: " + (session ? "exists" : "null"));
-      
+
       if (!session) {
         Logger.log("No session, showing session expired page");
         return HtmlService.createTemplateFromFile("SessionExpired")
@@ -54,14 +62,14 @@ function doGet(e) {
           .setTitle("Session Expired - NCDs Dashboard")
           .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
       }
-      
+
       Logger.log("Session found for user: " + session.username + ", amphoe: " + session.amphoe);
       return HtmlService.createTemplateFromFile("Admin")
         .evaluate()
         .setTitle("Admin Panel - NCDs Dashboard")
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
-    
+
     // หน้า login
     if (page === "login") {
       return HtmlService.createTemplateFromFile("Login")
@@ -69,7 +77,7 @@ function doGet(e) {
         .setTitle("Login - NCDs Dashboard")
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
-    
+
     // หน้า dashboard ปกติ
     return HtmlService.createTemplateFromFile("index")
       .evaluate()
@@ -85,6 +93,47 @@ function doGet(e) {
   }
 }
 
+/** ====== POST ENTRYPOINT FOR SPA API ====== **/
+function doPost(e) {
+  try {
+    const action = e.parameter.action;
+
+    if (action === "login") {
+      const username = e.parameter.username;
+      const password = e.parameter.password;
+      const result = login(username, password);
+
+      return ContentService.createTextOutput(
+        JSON.stringify(result)
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (action === "logout") {
+      const result = logout();
+      return ContentService.createTextOutput(
+        JSON.stringify(result)
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (action === "checkSession") {
+      const result = checkSession();
+      return ContentService.createTextOutput(
+        JSON.stringify(result)
+      ).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    return ContentService.createTextOutput(
+      JSON.stringify({ success: false, error: "Invalid action" })
+    ).setMimeType(ContentService.MimeType.JSON);
+
+  } catch (error) {
+    Logger.log("Error in doPost: " + error.toString());
+    return ContentService.createTextOutput(
+      JSON.stringify({ success: false, error: error.toString() })
+    ).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
 /** ====== GET WEB APP URL ====== **/
 function getWebAppUrl() {
   return ScriptApp.getService().getUrl();
@@ -95,7 +144,7 @@ function testSession() {
   const session = getSession();
   Logger.log("=== TEST SESSION ===");
   Logger.log("Session: " + JSON.stringify(session));
-  
+
   if (session) {
     Logger.log("Username: " + session.username);
     Logger.log("Amphoe: " + session.amphoe);
@@ -103,10 +152,10 @@ function testSession() {
   } else {
     Logger.log("No session found");
   }
-  
+
   const checkResult = checkSession();
   Logger.log("CheckSession result: " + JSON.stringify(checkResult));
-  
+
   return checkResult;
 }
 
@@ -117,18 +166,18 @@ function testUserSheet() {
     if (!sh) {
       return { success: false, message: "ไม่พบชีท user" };
     }
-    
+
     const data = sh.getDataRange().getValues();
     const [headers, ...rows] = data;
-    
+
     Logger.log("=== USER SHEET ===");
     Logger.log("Headers: " + JSON.stringify(headers));
     Logger.log("Total users: " + rows.length);
-    
+
     // หา index ของคอลัมน์อำเภอ
     const amphoeIdx = headers.findIndex(h => String(h).trim() === "อำเภอ");
     Logger.log("Amphoe column index: " + amphoeIdx);
-    
+
     // แสดงข้อมูล user 3 คนแรก
     rows.slice(0, 3).forEach((row, i) => {
       Logger.log("User " + (i+1) + ": " + JSON.stringify({
@@ -136,7 +185,7 @@ function testUserSheet() {
         amphoe: amphoeIdx !== -1 ? row[amphoeIdx] : "N/A"
       }));
     });
-    
+
     return {
       success: true,
       headers: headers,
@@ -168,26 +217,26 @@ function login(username, password) {
     if (!sh) {
       return { success: false, message: "ไม่พบตาราง user" };
     }
-    
+
     const data = sh.getDataRange().getValues();
     if (data.length < 2) {
       return { success: false, message: "ไม่มีข้อมูล user" };
     }
-    
+
     const [headers, ...rows] = data;
     const userIdx = headers.findIndex(h => String(h).trim().toLowerCase() === "username");
     const passIdx = headers.findIndex(h => String(h).trim().toLowerCase() === "password");
     const amphoeIdx = headers.findIndex(h => String(h).trim() === "อำเภอ");
-    
+
     if (userIdx === -1 || passIdx === -1) {
       return { success: false, message: "โครงสร้างตารางไม่ถูกต้อง" };
     }
-    
-    const user = rows.find(row => 
-      String(row[userIdx]).trim() === username && 
+
+    const user = rows.find(row =>
+      String(row[userIdx]).trim() === username &&
       String(row[passIdx]).trim() === password
     );
-    
+
     if (user) {
       // สร้าง session และเก็บใน ScriptProperties โดยอ้างอิงจาก sessionId
       const sessionId = Utilities.getUuid();
@@ -203,7 +252,7 @@ function login(username, password) {
         loginTime: now
       };
       putSession_(sessionObj);
-      
+
       // เก็บ sessionId ใน UserProperties เพื่อให้ doGet อ่านได้
       const userProperties = PropertiesService.getUserProperties();
       userProperties.setProperty("sessionId", sessionId);
@@ -234,15 +283,15 @@ function logout(sessionId) {
     // ลบ sessionId จาก UserProperties ด้วย
     const userProperties = PropertiesService.getUserProperties();
     userProperties.deleteProperty("sessionId");
-    
-    return { 
-      success: true, 
+
+    return {
+      success: true,
       message: "ออกจากระบบสำเร็จ",
       redirectUrl: ScriptApp.getService().getUrl()
     };
   } catch (error) {
-    return { 
-      success: false, 
+    return {
+      success: false,
       message: "เกิดข้อผิดพลาด: " + error.toString(),
       redirectUrl: ScriptApp.getService().getUrl()
     };
@@ -253,31 +302,31 @@ function getSession() {
   try {
     const userProperties = PropertiesService.getUserProperties();
     const sessionId = userProperties.getProperty("sessionId");
-    
+
     Logger.log("Getting session from UserProperties - SessionId: " + sessionId);
-    
+
     if (!sessionId) {
       Logger.log("No sessionId found in UserProperties");
       return null;
     }
-    
+
     // ใช้ sessionId ไปดึงข้อมูล session จริงจาก ScriptProperties
     const session = getSessionById_(sessionId);
     if (!session) {
       Logger.log("Session not found in ScriptProperties");
       return null;
     }
-    
+
     Logger.log("Session found - Username: " + session.username + ", Amphoe: " + session.amphoe);
-    
+
     // ตรวจสอบว่า session หมดอายุหรือไม่ (24 ชั่วโมง)
     if (session.loginTime) {
       const now = new Date().getTime();
       const login = parseInt(session.loginTime);
-      
+
       if (!isNaN(login)) {
         const hoursPassed = (now - login) / (1000 * 60 * 60);
-        
+
         if (hoursPassed > 24) {
           Logger.log("Session expired");
           clearSessionById_(sessionId);
@@ -286,7 +335,7 @@ function getSession() {
         }
       }
     }
-    
+
     return session;
   } catch (error) {
     Logger.log("Error in getSession: " + error.toString());
@@ -299,20 +348,20 @@ function checkSession(sessionId) {
     // รองรับตรวจสอบด้วย sessionId ที่รับมาจาก client
     const session = sessionId ? getSessionById_(sessionId) : getSession();
     if (session) {
-      return { 
-        success: true, 
+      return {
+        success: true,
         username: session.username || "",
         amphoe: session.amphoe || "",
         loginTime: session.loginTime
       };
     }
-    return { 
+    return {
       success: false,
       message: "ไม่พบ session"
     };
   } catch (error) {
     Logger.log("Error in checkSession: " + error.toString());
-    return { 
+    return {
       success: false,
       message: "เกิดข้อผิดพลาด: " + error.toString()
     };
@@ -348,44 +397,44 @@ function getAdminDataObj(sessionId) {
       Logger.log("No session found");
       return { data: [], updatedAt: new Date(), error: "ไม่ได้ล็อกอิน" };
     }
-    
+
     const amphoe = session.amphoe;
     if (!amphoe) {
       Logger.log("No amphoe in session");
       return { data: [], updatedAt: new Date(), error: "ไม่ได้กำหนดอำเภอ" };
     }
-    
+
     Logger.log("Loading data for amphoe: " + amphoe);
-    
+
     const cache = CacheService.getScriptCache();
     const cacheKey = "admin_rows_" + amphoe;
     let json = cache.get(cacheKey);
-    
+
     if (!json) {
       const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
       const values = sh.getDataRange().getValues();
       const trim = (x) => (x == null ? "" : String(x).trim());
       let data = [];
-      
+
       if (values && values.length > 1) {
         const [header, ...rows] = values;
         const amphoeIdx = header.findIndex(h => trim(h) === "อำเภอ");
-        
+
         Logger.log("Amphoe column index: " + amphoeIdx);
         Logger.log("Total rows: " + rows.length);
-        
+
         data = rows
           .filter((r) => r.some((v) => String(v).trim() !== "")) // ข้ามแถวว่าง
           .filter((r) => amphoeIdx !== -1 && trim(r[amphoeIdx]) === amphoe) // กรองเฉพาะอำเภอของ admin
           .map((r) => Object.fromEntries(header.map((h, i) => [trim(h), r[i]])));
-        
+
         Logger.log("Filtered data count: " + data.length);
       }
-      
+
       json = JSON.stringify({ data, updatedAt: new Date(), amphoe: amphoe });
       cache.put(cacheKey, json, CACHE_TTL_SECONDS);
     }
-    
+
     const result = JSON.parse(json);
     Logger.log("Returning data with " + result.data.length + " rows");
     return result;
@@ -407,15 +456,15 @@ function ensureUuidColumn() {
   try {
     const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
     const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
-    
+
     // เช็คว่ามีคอลัมน์ "id" หรือยัง
     const uuidIdx = headers.findIndex(h => String(h).trim().toLowerCase() === "id");
-    
+
     if (uuidIdx === -1) {
       // ยังไม่มีคอลัมน์ id - เพิ่มเป็นคอลัมน์แรก
       sh.insertColumnBefore(1);
       sh.getRange(1, 1).setValue("id");
-      
+
       // สร้าง UUID ให้กับข้อมูลเดิมทั้งหมด
       const lastRow = sh.getLastRow();
       if (lastRow > 1) {
@@ -425,11 +474,11 @@ function ensureUuidColumn() {
         }
         sh.getRange(2, 1, uuids.length, 1).setValues(uuids);
       }
-      
+
       Logger.log("UUID column created and populated");
       return 0; // คอลัมน์แรก
     }
-    
+
     return uuidIdx;
   } catch (error) {
     Logger.log("Error ensuring UUID column: " + error.toString());
@@ -481,15 +530,15 @@ function importData(csvData, sessionId) {
     if (!session) {
       return { success: false, message: "ไม่ได้ล็อกอิน" };
     }
-    
+
     const adminAmphoe = session.amphoe;
     if (!adminAmphoe) {
       return { success: false, message: "ไม่ได้กำหนดอำเภอสำหรับ admin นี้" };
     }
-    
+
     // ตรวจสอบและสร้างคอลัมน์ UUID ถ้ายังไม่มี
     ensureUuidColumn();
-    
+
     const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
     const existingHeaders = sh
       .getRange(1, 1, 1, sh.getLastColumn())
@@ -518,7 +567,7 @@ function importData(csvData, sessionId) {
     }
 
     const [headers, ...dataRows] = rows;
-    
+
     // หา index ของคอลัมน์สำคัญ
     const uuidIdx = getUuidColumnIndex(existingHeaders);
     const amphoeIdx = existingHeaders.findIndex(h => String(h).trim() === "อำเภอ");
@@ -553,7 +602,7 @@ function importData(csvData, sessionId) {
     dataRows.forEach((row) => {
       // ปรับขนาด row ให้ตรงกับ existingHeaders
       const maskedRow = new Array(existingHeaders.length).fill("");
-      
+
       // คัดลอกข้อมูลจาก import
       headers.forEach((header, i) => {
         const targetIdx = existingHeaders.findIndex(h => String(h).trim() === String(header).trim());
@@ -569,7 +618,7 @@ function importData(csvData, sessionId) {
       if (lnameIdx !== -1 && maskedRow[lnameIdx]) {
         maskedRow[lnameIdx] = maskName(String(maskedRow[lnameIdx]));
       }
-      
+
       // เซตอำเภอตาม admin
       if (amphoeIdx !== -1) {
         maskedRow[amphoeIdx] = adminAmphoe;
@@ -635,15 +684,15 @@ function addSingleRecord(recordData, sessionId) {
     if (!session) {
       return { success: false, message: "ไม่ได้ล็อกอิน" };
     }
-    
+
     const adminAmphoe = session.amphoe;
     if (!adminAmphoe) {
       return { success: false, message: "ไม่ได้กำหนดอำเภอสำหรับ admin นี้" };
     }
-    
+
     // ตรวจสอบและสร้างคอลัมน์ UUID ถ้ายังไม่มี
     ensureUuidColumn();
-    
+
     const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
     const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
     const uuidIdx = getUuidColumnIndex(headers);
@@ -654,19 +703,19 @@ function addSingleRecord(recordData, sessionId) {
     // สร้าง array ของข้อมูลตามลำดับ headers
     const rowData = headers.map((header) => {
       const key = String(header).trim();
-      
+
       // UUID - ใช้ค่าที่สร้างใหม่
       if (key.toLowerCase() === "id") {
         return newUuid;
       }
-      
+
       let value = recordData[key] || "";
 
       // ปกปิดชื่อและนามสกุล
       if (key === "ชื่อ" || key === "นามสกุล") {
         value = maskName(String(value));
       }
-      
+
       // เซตอำเภอตาม admin
       if (key === "อำเภอ") {
         value = adminAmphoe;
@@ -708,26 +757,26 @@ function updateRecordByUuid(uuid, recordData, sessionId) {
     if (!session) {
       return { success: false, message: "ไม่ได้ล็อกอิน" };
     }
-    
+
     const adminAmphoe = session.amphoe;
     if (!adminAmphoe) {
       return { success: false, message: "ไม่ได้กำหนดอำเภอสำหรับ admin นี้" };
     }
-    
+
     ensureUuidColumn();
-    
+
     const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
     const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
     const uuidIdx = getUuidColumnIndex(headers);
-    
+
     if (uuidIdx === -1) {
       return { success: false, message: "ไม่พบคอลัมน์ id" };
     }
-    
+
     // หาแถวที่มี UUID ตรงกัน
     const lastRow = sh.getLastRow();
     let targetRow = -1;
-    
+
     for (let i = 2; i <= lastRow; i++) {
       const cellUuid = sh.getRange(i, uuidIdx + 1).getValue();
       if (String(cellUuid).trim() === String(uuid).trim()) {
@@ -735,11 +784,11 @@ function updateRecordByUuid(uuid, recordData, sessionId) {
         break;
       }
     }
-    
+
     if (targetRow === -1) {
       return { success: false, message: "ไม่พบข้อมูลที่ต้องการแก้ไข" };
     }
-    
+
     // ตรวจสอบว่าเป็นของอำเภอเดียวกันหรือไม่
     const amphoeIdx = headers.findIndex(h => String(h).trim() === "อำเภอ");
     if (amphoeIdx !== -1) {
@@ -752,19 +801,19 @@ function updateRecordByUuid(uuid, recordData, sessionId) {
     // สร้าง array ของข้อมูลตามลำดับ headers
     const rowData = headers.map((header) => {
       const key = String(header).trim();
-      
+
       // เก็บ UUID เดิม
       if (key.toLowerCase() === "id") {
         return uuid;
       }
-      
+
       let value = recordData[key] || "";
 
       // ปกปิดชื่อและนามสกุล
       if (key === "ชื่อ" || key === "นามสกุล") {
         value = maskName(String(value));
       }
-      
+
       // บังคับอำเภอตาม admin
       if (key === "อำเภอ") {
         value = adminAmphoe;
@@ -800,25 +849,25 @@ function updateRecordByUuid(uuid, recordData, sessionId) {
 function updateRecord(rowIndex, recordData, sessionId) {
   // Kept for backward compatibility
   Logger.log("WARNING: updateRecord by rowIndex is deprecated. Use updateRecordByUuid instead.");
-  
+
   try {
     const session = sessionId ? getSessionById_(sessionId) : getSession();
     if (!session) {
       return { success: false, message: "ไม่ได้ล็อกอิน" };
     }
-    
+
     const adminAmphoe = session.amphoe;
     const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
     const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
     const uuidIdx = getUuidColumnIndex(headers);
-    
+
     if (uuidIdx !== -1 && rowIndex >= 2 && rowIndex <= sh.getLastRow()) {
       const uuid = sh.getRange(rowIndex, uuidIdx + 1).getValue();
       if (uuid) {
         return updateRecordByUuid(String(uuid), recordData, sessionId);
       }
     }
-    
+
     return { success: false, message: "ไม่สามารถอัปเดตได้" };
   } catch (error) {
     return { success: false, message: error.toString() };
@@ -833,26 +882,26 @@ function deleteRecordByUuid(uuid, sessionId) {
     if (!session) {
       return { success: false, message: "ไม่ได้ล็อกอิน" };
     }
-    
+
     const adminAmphoe = session.amphoe;
     if (!adminAmphoe) {
       return { success: false, message: "ไม่ได้กำหนดอำเภอสำหรับ admin นี้" };
     }
-    
+
     ensureUuidColumn();
-    
+
     const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
     const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
     const uuidIdx = getUuidColumnIndex(headers);
-    
+
     if (uuidIdx === -1) {
       return { success: false, message: "ไม่พบคอลัมน์ id" };
     }
-    
+
     // หาแถวที่มี UUID ตรงกัน
     const lastRow = sh.getLastRow();
     let targetRow = -1;
-    
+
     for (let i = 2; i <= lastRow; i++) {
       const cellUuid = sh.getRange(i, uuidIdx + 1).getValue();
       if (String(cellUuid).trim() === String(uuid).trim()) {
@@ -860,11 +909,11 @@ function deleteRecordByUuid(uuid, sessionId) {
         break;
       }
     }
-    
+
     if (targetRow === -1) {
       return { success: false, message: "ไม่พบข้อมูลที่ต้องการลบ" };
     }
-    
+
     // ตรวจสอบว่าเป็นของอำเภอเดียวกันหรือไม่
     const amphoeIdx = headers.findIndex(h => String(h).trim() === "อำเภอ");
     if (amphoeIdx !== -1) {
@@ -873,7 +922,7 @@ function deleteRecordByUuid(uuid, sessionId) {
         return { success: false, message: "ไม่สามารถลบข้อมูลของอำเภออื่นได้" };
       }
     }
-    
+
     // ลบแถว
     sh.deleteRow(targetRow);
 
@@ -900,24 +949,24 @@ function deleteRecordByUuid(uuid, sessionId) {
 function deleteRecord(rowIndex, sessionId) {
   // Kept for backward compatibility
   Logger.log("WARNING: deleteRecord by rowIndex is deprecated. Use deleteRecordByUuid instead.");
-  
+
   try {
     const session = sessionId ? getSessionById_(sessionId) : getSession();
     if (!session) {
       return { success: false, message: "ไม่ได้ล็อกอิน" };
     }
-    
+
     const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
     const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
     const uuidIdx = getUuidColumnIndex(headers);
-    
+
     if (uuidIdx !== -1 && rowIndex >= 2 && rowIndex <= sh.getLastRow()) {
       const uuid = sh.getRange(rowIndex, uuidIdx + 1).getValue();
       if (uuid) {
         return deleteRecordByUuid(String(uuid), sessionId);
       }
     }
-    
+
     return { success: false, message: "ไม่สามารถลบได้" };
   } catch (error) {
     return { success: false, message: error.toString() };
@@ -1024,26 +1073,26 @@ function exportDataWithUuid(sessionId) {
     if (!session) {
       return { success: false, message: "ไม่ได้ล็อกอิน" };
     }
-    
+
     const adminAmphoe = session.amphoe;
     if (!adminAmphoe) {
       return { success: false, message: "ไม่ได้กำหนดอำเภอสำหรับ admin นี้" };
     }
-    
+
     ensureUuidColumn();
-    
+
     const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
     const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
     const amphoeIdx = headers.findIndex(h => String(h).trim() === "อำเภอ");
-    
+
     // อ่านข้อมูลทั้งหมด
     const lastRow = sh.getLastRow();
     if (lastRow < 2) {
       return { success: false, message: "ไม่มีข้อมูลสำหรับส่งออก" };
     }
-    
+
     const allData = sh.getRange(2, 1, lastRow - 1, headers.length).getValues();
-    
+
     // กรองเฉพาะข้อมูลของอำเภอนี้
     const filteredData = allData.filter(row => {
       if (amphoeIdx !== -1) {
@@ -1051,16 +1100,16 @@ function exportDataWithUuid(sessionId) {
       }
       return true;
     });
-    
+
     if (filteredData.length === 0) {
       return { success: false, message: "ไม่มีข้อมูลสำหรับอำเภอ " + adminAmphoe };
     }
-    
+
     // สร้าง spreadsheet ใหม่สำหรับ export
     const exportSS = SpreadsheetApp.create("NCDs_Export_" + adminAmphoe + "_" + new Date().toISOString().split('T')[0]);
     const exportSheet = exportSS.getSheets()[0];
     exportSheet.setName("ncd_data");
-    
+
     // ใส่ headers
     exportSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     exportSheet
@@ -1068,17 +1117,17 @@ function exportDataWithUuid(sessionId) {
       .setBackground("#4c74ff")
       .setFontColor("#ffffff")
       .setFontWeight("bold");
-    
+
     // ใส่ข้อมูล
     exportSheet.getRange(2, 1, filteredData.length, headers.length).setValues(filteredData);
-    
+
     // ปรับความกว้างคอลัมน์
     for (let i = 1; i <= headers.length; i++) {
       exportSheet.autoResizeColumn(i);
     }
-    
+
     const url = exportSS.getUrl();
-    
+
     return {
       success: true,
       url: url,
