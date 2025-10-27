@@ -491,7 +491,7 @@ function getDataObj() {
         .filter((r) => r.some((v) => String(v).trim() !== "")) // ข้ามแถวว่าง
         .map((r) => Object.fromEntries(header.map((h, i) => [trim(h), r[i]])));
     }
-    json = JSON.stringify({ data, updatedAt: new Date() });
+    json = JSON.stringify({ success: true, data, updatedAt: new Date() });
     cache.put("rows", json, CACHE_TTL_SECONDS);
   }
   return JSON.parse(json); // ส่งเป็น object ให้ client ตรงๆ
