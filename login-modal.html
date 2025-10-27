@@ -1,0 +1,296 @@
+<!-- Login Modal -->
+<div id="login-modal" class="modal" style="display: none">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>🔐 Admin Login</h2>
+      <span class="close" id="close-login-modal">&times;</span>
+    </div>
+    <form id="login-form">
+      <div class="form-group">
+        <label for="login-username">Username</label>
+        <input 
+          type="text" 
+          id="login-username" 
+          name="username"
+          placeholder="ชื่อผู้ใช้"
+          required 
+          autocomplete="username"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="login-password">Password</label>
+        <input 
+          type="password" 
+          id="login-password" 
+          name="password"
+          placeholder="รหัสผ่าน"
+          required
+          autocomplete="current-password"
+        />
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" id="cancel-login">
+          ยกเลิก
+        </button>
+        <button type="submit" class="btn btn-primary">
+          เข้าสู่ระบบ
+        </button>
+      </div>
+    </form>
+
+    <div style="margin-top: 20px; text-align: center; font-size: 0.9rem; color: var(--text-secondary);">
+      <p>📌 สำหรับผู้ดูแลระบบเท่านั้น</p>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* Login Modal Styles */
+  .modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    animation: fadeIn 0.3s ease;
+  }
+
+  .modal-content {
+    background-color: var(--card-bg);
+    margin: 10% auto;
+    padding: 30px;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 450px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    animation: slideDown 0.3s ease;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid var(--border-color);
+  }
+
+  .modal-header h2 {
+    color: var(--text-primary);
+    margin: 0;
+    font-size: 1.5rem;
+  }
+
+  .close {
+    color: var(--text-secondary);
+    font-size: 32px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.3s ease;
+    line-height: 1;
+  }
+
+  .close:hover {
+    color: var(--text-primary);
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
+  .form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+    font-weight: 500;
+    font-size: 0.95rem;
+  }
+
+  .form-group input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 1rem;
+    transition: border-color 0.3s ease;
+    box-sizing: border-box;
+  }
+
+  .form-group input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+  }
+
+  .form-group input::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.6;
+  }
+
+  .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 30px;
+  }
+
+  .form-actions button {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+  }
+
+  .btn-primary {
+    background: var(--primary-color);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: var(--primary-hover);
+    transform: translateY(-2px);
+  }
+
+  .btn-secondary {
+    background: var(--card-bg);
+    color: var(--text-primary);
+    border: 2px solid var(--border-color);
+  }
+
+  .btn-secondary:hover {
+    background: var(--hover-bg);
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideDown {
+    from {
+      transform: translateY(-50px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .modal-content {
+      width: 95%;
+      margin: 20% auto;
+      padding: 20px;
+    }
+
+    .modal-header h2 {
+      font-size: 1.3rem;
+    }
+
+    .form-actions {
+      flex-direction: column;
+    }
+
+    .form-actions button {
+      width: 100%;
+    }
+  }
+</style>
+
+<script>
+  // Login Modal Logic
+  (function() {
+    const loginModal = document.getElementById('login-modal');
+    const adminLoginBtn = document.getElementById('admin-login-btn');
+    const closeLoginModal = document.getElementById('close-login-modal');
+    const cancelLogin = document.getElementById('cancel-login');
+    const loginForm = document.getElementById('login-form');
+
+    // Open modal
+    if (adminLoginBtn) {
+      adminLoginBtn.addEventListener('click', () => {
+        loginModal.style.display = 'block';
+      });
+    }
+
+    // Close modal
+    if (closeLoginModal) {
+      closeLoginModal.addEventListener('click', () => {
+        loginModal.style.display = 'none';
+      });
+    }
+
+    if (cancelLogin) {
+      cancelLogin.addEventListener('click', () => {
+        loginModal.style.display = 'none';
+      });
+    }
+
+    // Close on outside click
+    window.addEventListener('click', (e) => {
+      if (e.target === loginModal) {
+        loginModal.style.display = 'none';
+      }
+    });
+
+    // Handle login form submit
+    if (loginForm) {
+      loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const username = document.getElementById('login-username').value.trim();
+        const password = document.getElementById('login-password').value;
+
+        if (!username || !password) {
+          alert('❌ กรุณากรอก Username และ Password');
+          return;
+        }
+
+        try {
+          // Disable form
+          loginForm.querySelectorAll('button').forEach(btn => {
+            btn.disabled = true;
+          });
+
+          // Show loading
+          const submitBtn = loginForm.querySelector('button[type="submit"]');
+          const originalText = submitBtn.textContent;
+          submitBtn.textContent = '⏳ กำลังเข้าสู่ระบบ...';
+
+          // Call auth.login()
+          const result = await auth.login(username, password);
+
+          if (result.success) {
+            alert('✅ เข้าสู่ระบบสำเร็จ!');
+            loginModal.style.display = 'none';
+            
+            // Redirect to admin panel
+            window.location.href = 'admin.html';
+          } else {
+            throw new Error(result.message || 'Login failed');
+          }
+        } catch (error) {
+          console.error('Login error:', error);
+          alert('❌ เข้าสู่ระบบไม่สำเร็จ\n' + error.message);
+
+          // Re-enable form
+          loginForm.querySelectorAll('button').forEach(btn => {
+            btn.disabled = false;
+          });
+
+          const submitBtn = loginForm.querySelector('button[type="submit"]');
+          submitBtn.textContent = 'เข้าสู่ระบบ';
+        }
+      });
+    }
+  })();
+</script>

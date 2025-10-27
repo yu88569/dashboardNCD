@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Panel - NCDs Dashboard</title>
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles.css" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>" />
+
+    <style>
+      /* Admin-specific styles */
+      .admin-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+
+      .admin-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 2px solid var(--border-color);
+      }
+
+      .admin-header h1 {
+        font-size: 2rem;
+        color: var(--text-primary);
+        margin: 0;
+      }
+
+      .admin-info {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+
+      .user-info {
+        padding: 8px 16px;
+        background: var(--card-bg);
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+      }
+
+      .user-info strong {
+        color: var(--primary-color);
+      }
+
+      .admin-actions {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+      }
+
+      .admin-actions button {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .btn-primary {
+        background: var(--primary-color);
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: var(--primary-hover);
+        transform: translateY(-2px);
+      }
+
+      .btn-secondary {
+        background: var(--card-bg);
+        color: var(--text-primary);
+        border: 1px solid var(--border-color);
+      }
+
+      .btn-secondary:hover {
+        background: var(--hover-bg);
+      }
+
+      .btn-danger {
+        background: #ff4757;
+        color: white;
+      }
+
+      .btn-danger:hover {
+        background: #ee5a6f;
+      }
+
+      .btn-success {
+        background: #2ecc71;
+        color: white;
+      }
+
+      .btn-success:hover {
+        background: #27ae60;
+      }
+
+      .data-table-container {
+        background: var(--card-bg);
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: var(--card-shadow);
+        overflow-x: auto;
+      }
+
+      .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+      }
+
+      .data-table th,
+      .data-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .data-table th {
+        background: var(--hover-bg);
+        color: var(--text-primary);
+        font-weight: 600;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+
+      .data-table tr:hover {
+        background: var(--hover-bg);
+      }
+
+      .data-table td {
+        color: var(--text-secondary);
+      }
+
+      .action-buttons {
+        display: flex;
+        gap: 8px;
+      }
+
+      .action-buttons button {
+        padding: 6px 12px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: all 0.2s ease;
+      }
+
+      .btn-edit {
+        background: #3498db;
+        color: white;
+      }
+
+      .btn-edit:hover {
+        background: #2980b9;
+      }
+
+      .btn-delete {
+        background: #e74c3c;
+        color: white;
+      }
+
+      .btn-delete:hover {
+        background: #c0392b;
+      }
+
+      /* Modal Styles */
+      .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        animation: fadeIn 0.3s ease;
+      }
+
+      .modal-content {
+        background-color: var(--card-bg);
+        margin: 5% auto;
+        padding: 30px;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 600px;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        animation: slideDown 0.3s ease;
+      }
+
+      .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid var(--border-color);
+      }
+
+      .modal-header h2 {
+        color: var(--text-primary);
+        margin: 0;
+      }
+
+      .close {
+        color: var(--text-secondary);
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: color 0.3s ease;
+      }
+
+      .close:hover {
+        color: var(--text-primary);
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+
+      .form-group input,
+      .form-group select,
+      .form-group textarea {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        font-size: 0.95rem;
+        transition: border-color 0.3s ease;
+      }
+
+      .form-group input:focus,
+      .form-group select:focus,
+      .form-group textarea:focus {
+        outline: none;
+        border-color: var(--primary-color);
+      }
+
+      .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 30px;
+      }
+
+      .loading {
+        display: none;
+        text-align: center;
+        padding: 40px;
+        color: var(--text-secondary);
+      }
+
+      .loading.active {
+        display: block;
+      }
+
+      .spinner {
+        border: 4px solid var(--border-color);
+        border-top: 4px solid var(--primary-color);
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 20px;
+      }
+
+      .stats-summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 30px;
+      }
+
+      .stat-card {
+        background: var(--card-bg);
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: var(--card-shadow);
+        text-align: center;
+      }
+
+      .stat-card h3 {
+        font-size: 2rem;
+        color: var(--primary-color);
+        margin: 0 0 10px 0;
+      }
+
+      .stat-card p {
+        color: var(--text-secondary);
+        margin: 0;
+        font-size: 0.9rem;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+
+      @keyframes slideDown {
+        from {
+          transform: translateY(-50px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Responsive */
+      @media (max-width: 768px) {
+        .admin-header {
+          flex-direction: column;
+          gap: 15px;
+          align-items: flex-start;
+        }
+
+        .admin-actions {
+          flex-direction: column;
+        }
+
+        .admin-actions button {
+          width: 100%;
+        }
+
+        .data-table {
+          font-size: 0.8rem;
+        }
+
+        .data-table th,
+        .data-table td {
+          padding: 8px;
+        }
+
+        .modal-content {
+          width: 95%;
+          margin: 10% auto;
+          padding: 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="admin-container">
+      <!-- Header -->
+      <div class="admin-header">
+        <h1>🔐 Admin Panel</h1></h1>
+        <div class="admin-info">
+          <div class="user-info">
+            <strong id="username">-</strong> |
+            <span id="amphoe">-</span>
+          </div>
+          <button id="theme-toggle" class="btn-secondary">🌙</button>
+          <button id="logout-btn" class="btn-danger">ออกจากระบบ</button>
+        </div>
+      </div>
+
+      <!-- Stats Summary -->
+      <div class="stats-summary">
+        <div class="stat-card">
+          <h3 id="total-records">0</h3>
+          <p>รายการทั้งหมด</p>
+        </div>
+        <div class="stat-card">
+          <h3 id="total-risk">0</h3>
+          <p>เสี่ยง</p>
+        </div>
+        <div class="stat-card">
+          <h3 id="total-normal">0</h3>
+          <p>ปกติ</p>
+        </div>
+        <div class="stat-card">
+          <h3 id="total-finished">0</h3>
+          <p>เสร็จสิ้น</p>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="admin-actions">
+        <button id="add-record-btn" class="btn-primary">
+          ➕ เพิ่มรายการใหม่
+        </button>
+        <button id="import-csv-btn" class="btn-secondary">
+          📁 นำเข้า CSV
+        </button>
+        <button id="export-btn" class="btn-success">
+          📊 ส่งออกข้อมูล
+        </button>
+        <button id="refresh-btn" class="btn-secondary">
+          🔄 รีเฟรช
+        </button>
+        <button id="back-to-dashboard-btn" class="btn-secondary">
+          🏠 กลับหน้าหลัก
+        </button>
+      </div>
+
+      <!-- Loading -->
+      <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <p>กำลังโหลดข้อมูล...</p>
+      </div>
+
+      <!-- Data Table -->
+      <div id="data-container" class="data-table-container" style="display: none">
+        <table class="data-table" id="data-table">
+          <thead>
+            <tr>
+              <th>ลำดับ</th>
+              <th>ชื่อ</th>
+              <th>นามสกุล</th>
+              <th>เพศ</th>
+              <th>ตำบล</th>
+              <th>สถานะ NCDs</th>
+              <th>จัดการ</th>
+            </tr>
+          </thead>
+          <tbody id="table-body">
+            <!-- Data will be inserted here -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Add/Edit Record Modal -->
+    <div id="record-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="modal-title">เพิ่มรายการใหม่</h2>
+          <span class="close" id="close-record-modal">&times;</span>
+        </div>
+        <form id="record-form">
+          <input type="hidden" id="record-index" />
+
+          <div class="form-group">
+            <label for="fname">ชื่อ *</label>
+            <input type="text" id="fname" name="fname" required />
+          </div>
+
+          <div class="form-group">
+            <label for="lname">นามสกุล *</label>
+            <input type="text" id="lname" name="lname" required />
+          </div>
+
+          <div class="form-group">
+            <label for="gender">เพศ *</label>
+            <select id="gender" name="gender" required>
+              <option value="">-- เลือกเพศ --</option>
+              <option value="ชาย">ชาย</option>
+              <option value="หญิง">หญิง</option>
+              <option value="พระสงฆ์">พระสงฆ์</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="village">ชื่อหมู่บ้าน</label>
+            <input type="text" id="village" name="village" />
+          </div>
+
+          <div class="form-group">
+            <label for="house">บ้านเลขที่</label>
+            <input type="text" id="house" name="house" />
+          </div>
+
+          <div class="form-group">
+            <label for="province">จังหวัด</label>
+            <input type="text" id="province" name="province" />
+          </div>
+
+          <div class="form-group">
+            <label for="amphoe">อำเภอ</label>
+            <input type="text" id="amphoe-input" name="amphoe" />
+          </div>
+
+          <div class="form-group">
+            <label for="tambon">ตำบล</label>
+            <input type="text" id="tambon" name="tambon" />
+          </div>
+
+          <div class="form-group">
+            <label for="phone">เบอร์โทรศัพท์</label>
+            <input type="tel" id="phone" name="phone" />
+          </div>
+
+          <div class="form-group">
+            <label for="ncd">ภาพรวมของการประเมินโรค NCDs</label>
+            <select id="ncd" name="ncd">
+              <option value="">-- เลือก --</option>
+              <option value="ปกติ">ปกติ</option>
+              <option value="เสี่ยง">เสี่ยง</option>
+              <option value="ป่วย">ป่วย</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="status">สถานะ</label>
+            <select id="status" name="status">
+              <option value="">-- เลือก --</option>
+              <option value="เสร็จสิ้น">เสร็จสิ้น</option>
+              <option value="อยู่ระหว่างดำเนินการ">อยู่ระหว่างดำเนินการ</option>
+            </select>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn-secondary" id="cancel-btn">
+              ยกเลิก
+            </button>
+            <button type="submit" class="btn-primary">
+              บันทึก
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Import CSV Modal -->
+    <div id="import-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>นำเข้าข้อมูล CSV</h2>
+          <span class="close" id="close-import-modal">&times;</span>
+        </div>
+        <div class="form-group">
+          <label for="csv-file">เลือกไฟล์ CSV</label>
+          <input type="file" id="csv-file" accept=".csv" />
+        </div>
+        <div class="form-group">
+          <label for="csv-preview">ตัวอย่างข้อมูล (5 แถวแรก)</label>
+          <textarea id="csv-preview" rows="10" readonly></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn-secondary" id="cancel-import-btn">
+            ยกเลิก
+          </button>
+          <button type="button" class="btn-primary" id="confirm-import-btn">
+            นำเข้าข้อมูล
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="config.js"></script>
+    <script src="auth.js"></script>
+    <script src="admin.js"></script>
+  </body>
+</html>
