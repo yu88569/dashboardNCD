@@ -1,194 +1,119 @@
-# NCDs Dashboard - GitHub Pages Deployment
+# 📚 Documentation
 
-## 📋 ภาพรวม
-
-โปรเจคนี้เป็น Single-Page Application (SPA) ที่แยก Frontend ออกมาจาก Google Apps Script และ deploy บน GitHub Pages โดยเชื่อมต่อกับ Apps Script Backend ผ่าน API
-
-## 🏗️ โครงสร้าง
-
-```
-docs/
-├── index.html       # หน้าหลัก Dashboard
-├── styles.css       # CSS styles
-├── app.js           # JavaScript logic
-└── README.md        # คู่มือนี้
-```
-
-## 🚀 วิธีการตั้งค่า GitHub Pages
-
-### 1. Push โค้ดขึ้น GitHub
-
-```bash
-# สร้าง repository ใหม่บน GitHub
-# จากนั้น push โค้ด
-
-git init
-git add .
-git commit -m "Initial commit: NCDs Dashboard SPA"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
-git push -u origin main
-```
-
-### 2. เปิดใช้งาน GitHub Pages
-
-1. ไปที่ repository บน GitHub
-2. คลิก **Settings** (ด้านบน)
-3. เลือก **Pages** จากเมนูด้านซ้าย
-4. ที่ **Source** เลือก `Deploy from a branch`
-5. ที่ **Branch** เลือก:
-   - Branch: `main`
-   - Folder: `/docs`
-6. คลิก **Save**
-
-รอสักครู่ จะมี URL ปรากฏขึ้น เช่น: `https://YOUR_USERNAME.github.io/YOUR_REPO/`
-
-### 3. ตั้งค่า Apps Script Backend
-
-#### 3.1 Deploy Apps Script เป็น Web App
-
-1. เปิด Google Apps Script project
-2. ไปที่ **Deploy** > **New deployment**
-3. เลือก **Web app**
-4. ตั้งค่า:
-   - **Description**: NCDs Dashboard API
-   - **Execute as**: Me
-   - **Who has access**: Anyone
-5. คลิก **Deploy**
-6. คัดลอก **Web app URL** (จะได้ URL ประมาณ `https://script.google.com/macros/s/...../exec`)
-
-#### 3.2 เพิ่ม CORS Headers (ถ้าจำเป็น)
-
-เพิ่มใน `code.gs`:
-
-```javascript
-function doGet(e) {
-  const output = // ... your existing code
-  return output
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-}
-```
-
-### 4. อัปเดต API URL ใน app.js
-
-แก้ไขไฟล์ `docs/app.js` บรรทัดที่ 4:
-
-```javascript
-const API_URL = 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec';
-```
-
-เปลี่ยน `YOUR_DEPLOYMENT_ID` เป็น deployment ID ที่คัดลอกมาจากขั้นตอน 3.1
-
-### 5. Push การเปลี่ยนแปลง
-
-```bash
-git add docs/app.js
-git commit -m "Update API URL"
-git push
-```
-
-รอสัก 1-2 นาที GitHub Pages จะ rebuild และ deploy อัตโนมัติ
-
-## 🔧 การตั้งค่า Apps Script API Endpoints
-
-ตรวจสอบว่า `code.gs` มี endpoints เหล่านี้:
-
-### GET Endpoints
-
-```javascript
-// ดึงข้อมูล
-?action=getData
-
-// ตัวอย่าง Response:
-{
-  "success": true,
-  "data": [...],
-  "updatedAt": "2024-01-01T00:00:00.000Z"
-}
-```
-
-### POST Endpoints
-
-```javascript
-// Login
-action=login&username=admin&password=1234
-
-// Logout
-action=logout
-
-// Check Session
-action=checkSession
-```
-
-## 📝 การใช้งาน
-
-1. เปิด URL ของ GitHub Pages
-2. Dashboard จะแสดงข้อมูล NCDs แบบ realtime
-3. กดปุ่ม "Admin Login" เพื่อเข้าสู่ระบบจัดการ
-4. เลือกกรองข้อมูลด้วย dropdown filters
-5. สลับ Theme ได้ที่ปุ่มด้านขวาบน (🌙/☀️)
-
-## 🎨 Features
-
-- ✅ Single-Page Application (SPA)
-- ✅ Dark/Light Theme
-- ✅ Responsive Design
-- ✅ Real-time Charts (ECharts)
-- ✅ Data Filtering
-- ✅ Secure Admin Login
-- ✅ Fast Loading (CDN)
-
-## 🔒 Security Notes
-
-1. **API URL ไม่ควร hardcode ข้อมูลสำคัญ** - ใช้ environment หรือ config file
-2. **Apps Script ต้องตั้ง permissions ให้ถูกต้อง** - "Anyone" สำหรับ public dashboard
-3. **Session management** - Apps Script จัดการ session ผ่าน UserProperties และ ScriptProperties
-4. **Data masking** - ชื่อ-นามสกุลถูก mask ก่อนส่งออกจาก API
-
-## 🐛 Troubleshooting
-
-### ปัญหา: ข้อมูลไม่โหลด
-
-- ตรวจสอบ API_URL ใน `app.js` ว่าถูกต้อง
-- เปิด Developer Console (F12) ดู error
-- ตรวจสอบว่า Apps Script deployment status เป็น "Active"
-
-### ปัญหา: CORS Error
-
-- ตรวจสอบว่า Apps Script ตั้งค่า "Who has access" เป็น "Anyone"
-- ลอง redeploy Apps Script ใหม่
-
-### ปัญหา: Login ไม่ได้
-
-- ตรวจสอบ username/password ใน Google Sheet (tab: user)
-- ตรวจสอบ API endpoint ใน browser network tab
-
-## 📚 เอกสารเพิ่มเติม
-
-- [GitHub Pages Documentation](https://docs.github.com/en/pages)
-- [Google Apps Script Web Apps](https://developers.google.com/apps-script/guides/web)
-- [ECharts Documentation](https://echarts.apache.org/)
-
-## 🔄 การอัปเดต
-
-เมื่อต้องการอัปเดตโค้ด:
-
-```bash
-# แก้ไขไฟล์ใน docs/
-git add .
-git commit -m "Update: your changes"
-git push
-```
-
-GitHub Pages จะ auto-deploy ภายใน 1-2 นาที
-
-## 📧 ติดต่อ
-
-หากมีปัญหาหรือข้อสงสัย กรุณาสร้าง Issue ใน repository นี้
+คู่มือและเอกสารประกอบสำหรับ NCDs Dashboard
 
 ---
 
-**License**: MIT  
-**Version**: 1.0.0  
-**Last Updated**: 2024
+## 📖 เอกสารทั้งหมด
+
+### 🚀 การเริ่มต้นใช้งาน
+
+| เอกสาร | รายละเอียด |
+|--------|-----------|
+| [**QUICKSTART.md**](QUICKSTART.md) | เริ่มต้นใช้งานใน 5 นาที - คู่มือแบบย่อ |
+| [**SETUP-GITHUB-PAGES.md**](SETUP-GITHUB-PAGES.md) | คู่มือตั้งค่า GitHub Pages แบบละเอียด |
+| [**DEPLOY-INSTRUCTIONS.md**](DEPLOY-INSTRUCTIONS.md) | คู่มือการ deploy ทั้งระบบ |
+
+---
+
+### 🔧 Technical Documentation
+
+| เอกสาร | รายละเอียด |
+|--------|-----------|
+| [**GOOGLE-SHEET-STRUCTURE.md**](GOOGLE-SHEET-STRUCTURE.md) | โครงสร้างฐานข้อมูล Google Sheets |
+| [**README-AppsScript.md**](README-AppsScript.md) | คู่มือ Apps Script Backend |
+| [**SESSION-FIX.md**](SESSION-FIX.md) | การแก้ไขปัญหา Session Management |
+
+---
+
+## 🎯 เริ่มต้นที่ไหนดี?
+
+### 👋 ผู้ใช้งานทั่วไป
+เริ่มที่: [QUICKSTART.md](QUICKSTART.md)
+
+### 👨‍💻 นักพัฒนา (Developer)
+1. อ่าน [SETUP-GITHUB-PAGES.md](SETUP-GITHUB-PAGES.md) - Setup Frontend
+2. อ่าน [../apps-script/README.md](../apps-script/README.md) - Setup Backend
+3. อ่าน [GOOGLE-SHEET-STRUCTURE.md](GOOGLE-SHEET-STRUCTURE.md) - เตรียมฐานข้อมูล
+
+### 🔧 ผู้ดูแลระบบ (Admin)
+1. อ่าน [DEPLOY-INSTRUCTIONS.md](DEPLOY-INSTRUCTIONS.md) - คู่มือ Deploy
+2. อ่าน [SESSION-FIX.md](SESSION-FIX.md) - แก้ปัญหา Session
+
+---
+
+## 📂 โครงสร้างเอกสาร
+
+```
+docs/
+├── README.md                      # เอกสารนี้ (สารบัญ)
+│
+├── 🚀 Getting Started
+│   ├── QUICKSTART.md              # เริ่มต้นใน 5 นาที
+│   ├── SETUP-GITHUB-PAGES.md      # Setup Frontend
+│   └── DEPLOY-INSTRUCTIONS.md     # Deploy ทั้งระบบ
+│
+└── 🔧 Technical Guides
+    ├── GOOGLE-SHEET-STRUCTURE.md  # Database Schema
+    ├── README-AppsScript.md       # Backend Guide
+    └── SESSION-FIX.md             # Troubleshooting
+```
+
+---
+
+## 🔗 Related Files
+
+- [`../README.md`](../README.md) - Project README (หน้าหลัก)
+- [`../apps-script/README.md`](../apps-script/README.md) - Backend Deployment Guide
+- [`../config.js`](../config.js) - Frontend Configuration
+- [`../apps-script/code.gs`](../apps-script/code.gs) - Backend Source Code
+
+---
+
+## 💡 Quick Links
+
+### Frontend (GitHub Pages)
+- **Live Site**: https://yu88569.github.io/dashboardNCD/
+- **Repository**: https://github.com/yu88569/dashboardNCD
+- **Source Code**: `../index.html`, `../app.js`, `../styles.css`
+
+### Backend (Apps Script)
+- **Source Code**: `../apps-script/code.gs`
+- **Deployment**: Google Apps Script Web App
+- **Database**: Google Sheets
+
+---
+
+## 📝 การอัปเดตเอกสาร
+
+หากต้องการแก้ไขหรือเพิ่มเติมเอกสาร:
+
+1. แก้ไขไฟล์ `.md` ที่ต้องการ
+2. Commit และ Push
+   ```bash
+   git add docs/
+   git commit -m "docs: Update documentation"
+   git push
+   ```
+
+---
+
+## 🤝 Contributing
+
+หากพบข้อผิดพลาดหรือต้องการเพิ่มเติมเอกสาร:
+1. Fork repository
+2. แก้ไขเอกสาร
+3. สร้าง Pull Request
+
+---
+
+## 📞 ต้องการความช่วยเหลือ?
+
+- 🐛 [Report Issues](https://github.com/yu88569/dashboardNCD/issues)
+- 💬 [Discussions](https://github.com/yu88569/dashboardNCD/discussions)
+- 📧 Contact: ผ่าน GitHub Issues
+
+---
+
+**Last Updated**: 2024  
+**Status**: Complete ✅
