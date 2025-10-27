@@ -47,9 +47,6 @@ function doGet(e) {
       return ContentService.createTextOutput(
         JSON.stringify(getDataObj())
       ).setMimeType(ContentService.MimeType.JSON)
-       .setHeader('Access-Control-Allow-Origin', '*')
-       .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-       .setHeader('Access-Control-Allow-Headers', 'Content-Type');
     }
 
     // ถ้าเรียก admin panel ต้องเช็ค session
@@ -93,9 +90,6 @@ function doGet(e) {
       return ContentService.createTextOutput(
         JSON.stringify({ success: false, error: error.toString() })
       ).setMimeType(ContentService.MimeType.JSON)
-       .setHeader('Access-Control-Allow-Origin', '*')
-       .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-       .setHeader('Access-Control-Allow-Headers', 'Content-Type');
     }
     // ถ้าเกิด error ให้ไปหน้า session expired
     return HtmlService.createTemplateFromFile("SessionExpired")
@@ -118,9 +112,6 @@ function doPost(e) {
       return ContentService.createTextOutput(
         JSON.stringify(result)
       ).setMimeType(ContentService.MimeType.JSON)
-       .setHeader('Access-Control-Allow-Origin', '*')
-       .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-       .setHeader('Access-Control-Allow-Headers', 'Content-Type');
     }
 
     if (action === "logout") {
@@ -128,9 +119,6 @@ function doPost(e) {
       return ContentService.createTextOutput(
         JSON.stringify(result)
       ).setMimeType(ContentService.MimeType.JSON)
-       .setHeader('Access-Control-Allow-Origin', '*')
-       .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-       .setHeader('Access-Control-Allow-Headers', 'Content-Type');
     }
 
     if (action === "checkSession") {
@@ -139,9 +127,6 @@ function doPost(e) {
       return ContentService.createTextOutput(
         JSON.stringify(result)
       ).setMimeType(ContentService.MimeType.JSON)
-       .setHeader('Access-Control-Allow-Origin', '*')
-       .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-       .setHeader('Access-Control-Allow-Headers', 'Content-Type');
     }
 
     if (action === "getAdminData") {
@@ -150,9 +135,6 @@ function doPost(e) {
       return ContentService.createTextOutput(
         JSON.stringify(result)
       ).setMimeType(ContentService.MimeType.JSON)
-       .setHeader('Access-Control-Allow-Origin', '*')
-       .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-       .setHeader('Access-Control-Allow-Headers', 'Content-Type');
     }
 
     if (action === "addRecord") {
@@ -162,9 +144,6 @@ function doPost(e) {
       return ContentService.createTextOutput(
         JSON.stringify(result)
       ).setMimeType(ContentService.MimeType.JSON)
-       .setHeader('Access-Control-Allow-Origin', '*')
-       .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-       .setHeader('Access-Control-Allow-Headers', 'Content-Type');
     }
 
     if (action === "updateRecord") {
@@ -175,9 +154,6 @@ function doPost(e) {
       return ContentService.createTextOutput(
         JSON.stringify(result)
       ).setMimeType(ContentService.MimeType.JSON)
-       .setHeader('Access-Control-Allow-Origin', '*')
-       .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-       .setHeader('Access-Control-Allow-Headers', 'Content-Type');
     }
 
     if (action === "deleteRecord") {
@@ -187,9 +163,6 @@ function doPost(e) {
       return ContentService.createTextOutput(
         JSON.stringify(result)
       ).setMimeType(ContentService.MimeType.JSON)
-       .setHeader('Access-Control-Allow-Origin', '*')
-       .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-       .setHeader('Access-Control-Allow-Headers', 'Content-Type');
     }
 
     if (action === "importCSV") {
@@ -199,9 +172,6 @@ function doPost(e) {
       return ContentService.createTextOutput(
         JSON.stringify(result)
       ).setMimeType(ContentService.MimeType.JSON)
-       .setHeader('Access-Control-Allow-Origin', '*')
-       .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-       .setHeader('Access-Control-Allow-Headers', 'Content-Type');
     }
 
     if (action === "exportToSheets") {
@@ -210,26 +180,17 @@ function doPost(e) {
       return ContentService.createTextOutput(
         JSON.stringify(result)
       ).setMimeType(ContentService.MimeType.JSON)
-       .setHeader('Access-Control-Allow-Origin', '*')
-       .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-       .setHeader('Access-Control-Allow-Headers', 'Content-Type');
     }
 
     return ContentService.createTextOutput(
       JSON.stringify({ success: false, error: "Invalid action: " + action })
     ).setMimeType(ContentService.MimeType.JSON)
-     .setHeader('Access-Control-Allow-Origin', '*')
-     .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-     .setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   } catch (error) {
     Logger.log("Error in doPost: " + error.toString());
     return ContentService.createTextOutput(
       JSON.stringify({ success: false, error: error.toString() })
     ).setMimeType(ContentService.MimeType.JSON)
-     .setHeader('Access-Control-Allow-Origin', '*')
-     .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-     .setHeader('Access-Control-Allow-Headers', 'Content-Type');
   }
 }
 
