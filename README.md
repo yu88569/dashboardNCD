@@ -1,72 +1,76 @@
-# 📊 NCDs Dashboard - ระบบติดตามโรคไม่ติดต่อเรื้อรัง
+# 📊 NCDs Dashboard
 
-> Single-Page Application (SPA) สำหรับติดตามและประเมินโรคไม่ติดต่อเรื้อรัง (NCDs)  
-> Deploy บน GitHub Pages เชื่อมต่อกับ Google Sheets ผ่าน Apps Script API
+> ระบบติดตามและประเมินโรคไม่ติดต่อเรื้อรัง (Non-Communicable Diseases)
 
-[![GitHub Pages](https://img.shields.io/badge/GitHub-Pages-blue)](https://pages.github.com/)
-[![Apps Script](https://img.shields.io/badge/Google-Apps%20Script-green)](https://developers.google.com/apps-script)
+[![GitHub Pages](https://img.shields.io/badge/Deploy-GitHub%20Pages-success)](https://yu88569.github.io/dashboardNCD/)
+[![Apps Script](https://img.shields.io/badge/Backend-Google%20Apps%20Script-green)](https://developers.google.com/apps-script)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ---
 
-## 🎯 ภาพรวมโปรเจค
+## 🎯 ภาพรวม
 
-NCDs Dashboard เป็นระบบ web application สำหรับติดตามและวิเคราะห์ข้อมูลโรคไม่ติดต่อเรื้อรัง (Non-Communicable Diseases) โดยแบ่งเป็น:
+NCDs Dashboard เป็นระบบ Web Application สำหรับติดตามและวิเคราะห์ข้อมูลโรคไม่ติดต่อเรื้อรัง โดยแบ่งเป็น:
 
-- **Frontend (SPA)**: Deploy บน GitHub Pages (ฟรี) - HTML, CSS, JavaScript
-- **Backend API**: Google Apps Script - เชื่อมต่อกับ Google Sheets
+- **Frontend**: Single Page Application (SPA) - Deploy บน GitHub Pages
+- **Backend**: REST API - ทำงานบน Google Apps Script
 - **Database**: Google Sheets - เก็บข้อมูล NCDs และ user accounts
 
 ---
 
 ## ✨ Features
 
-### 📈 Dashboard (Public)
-- ✅ KPI Cards - แสดงสถิติรวม, เสี่ยง, ปกติ, เสร็จสิ้น
+### 📈 Public Dashboard
+- ✅ KPI Cards - สถิติรวม, เสี่ยง, ปกติ, เสร็จสิ้น
 - ✅ Gender Statistics - แยกตามเพศ (ชาย, หญิง, พระสงฆ์)
 - ✅ Interactive Charts - ปัจจัยเสี่ยง, Top 10 ตำบล, สถานะป่วย/เสี่ยง
 - ✅ Data Filtering - กรองตามจังหวัด, อำเภอ, ตำบล, เพศ, สถานะ
-- ✅ Dark/Light Theme - สลับธีมได้
-- ✅ Responsive Design - ใช้งานได้ทั้ง Desktop และ Mobile
+- ✅ Dark/Light Theme Toggle
+- ✅ Responsive Design
 
-### 🔐 Admin Panel (Protected)
-- ✅ Secure Login - ระบบ authentication ผ่าน Google Sheets
-- ✅ Session Management - จำ session 24 ชั่วโมง
-- ✅ District-based Access - Admin เห็นเฉพาะข้อมูลอำเภอของตนเอง
-- ✅ Add Records - เพิ่มรายการใหม่
-- ✅ CSV Import - นำเข้าข้อมูลจากไฟล์
-- ✅ Data Export - ส่งออกข้อมูลเป็น Google Sheets
-- ✅ Privacy Protection - ปกปิดชื่อ-นามสกุลอัตโนมัติ
+### 🔐 Admin Panel
+- ✅ Secure Login - Authentication ผ่าน Google Sheets
+- ✅ Session Management (24 ชั่วโมง)
+- ✅ District-based Access Control
+- ✅ Add/Edit/Delete Records
+- ✅ CSV Import/Export
+- ✅ Privacy Protection (Data Masking)
 
 ---
 
 ## 🚀 Quick Start
 
-### ⚡ เริ่มต้นใน 5 นาที
+### 1️⃣ Setup Backend (Apps Script)
 
 ```bash
-# 1. Clone repository
-git clone https://github.com/YOUR_USERNAME/dashboardNCD.git
-cd dashboardNCD
-
-# 2. ตั้งค่า Apps Script (ดูรายละเอียดด้านล่าง)
-# 3. Deploy บน GitHub Pages
-# 4. อัปเดต API URL ใน docs/app.js
-# 5. เสร็จสิ้น!
+# 1. สร้าง Google Sheet พร้อม 2 tabs: ncd_db_central, user
+# 2. เปิด Extensions → Apps Script
+# 3. คัดลอกโค้ดจาก apps-script/code.gs
+# 4. Deploy → New deployment → Web app
+# 5. คัดลอก Web app URL
 ```
 
-📚 **อ่านคู่มือฉบับเต็ม**: [`QUICKSTART.md`](QUICKSTART.md)
+📖 **คู่มือละเอียด**: [apps-script/README.md](apps-script/README.md)
 
 ---
 
-## 📖 เอกสารประกอบ
+### 2️⃣ Setup Frontend (GitHub Pages)
 
-| เอกสาร | รายละเอียด |
-|--------|-----------|
-| 🚀 [**QUICKSTART.md**](QUICKSTART.md) | เริ่มต้นใช้งานใน 5 นาที |
-| 📘 [**SETUP-GITHUB-PAGES.md**](SETUP-GITHUB-PAGES.md) | คู่มือตั้งค่าแบบละเอียด |
-| 📊 [**GOOGLE-SHEET-STRUCTURE.md**](GOOGLE-SHEET-STRUCTURE.md) | โครงสร้าง Google Sheet |
-| 📝 [**AGENTS.md**](AGENTS.md) | Repository Guidelines |
+```bash
+# Clone repository
+git clone https://github.com/yu88569/dashboardNCD.git
+cd dashboardNCD
+
+# แก้ไข config.js
+# ใส่ Apps Script URL ที่ได้จากขั้นตอนที่ 1
+
+# Push to GitHub
+git add .
+git commit -m "Update API URL"
+git push
+```
+
+📖 **คู่มือละเอียด**: [docs/SETUP-GITHUB-PAGES.md](docs/SETUP-GITHUB-PAGES.md)
 
 ---
 
@@ -74,273 +78,181 @@ cd dashboardNCD
 
 ```
 dashboardNCD/
-├── docs/                          # 🌐 Frontend (GitHub Pages)
-│   ├── index.html                 # หน้า Dashboard หลัก
-│   ├── app.js                     # JavaScript logic
-│   ├── styles.css                 # CSS styles
-│   ├── config.example.js          # ตัวอย่าง config
-│   └── README.md                  # คู่มือ deployment
 │
-├── code.gs                        # ⚙️ Backend (Apps Script)
+├── 🌐 Frontend (GitHub Pages)
+│   ├── index.html          # หน้า Dashboard
+│   ├── app.js              # JavaScript logic
+│   ├── config.js           # API configuration
+│   └── styles.css          # CSS styles
 │
-├── HTML Templates/                # 📄 Apps Script HTML (เดิม)
-│   ├── index.html
-│   ├── Admin.html
-│   ├── Login.html
-│   ├── Header.html
-│   ├── Kpis.html
-│   ├── Charts.html
-│   ├── Scripts.html
-│   └── Styles.html
+├── 🔧 Backend (Apps Script)
+│   ├── code.gs             # Server-side logic
+│   └── README.md           # Deploy instructions
 │
-└── Documentation/
-    ├── README.md                  # เอกสารนี้
-    ├── QUICKSTART.md              # เริ่มต้นใช้งาน
-    ├── SETUP-GITHUB-PAGES.md      # คู่มือ setup
-    └── GOOGLE-SHEET-STRUCTURE.md  # โครงสร้างข้อมูล
+├── 📚 Documentation
+│   ├── GOOGLE-SHEET-STRUCTURE.md
+│   ├── SETUP-GITHUB-PAGES.md
+│   ├── QUICKSTART.md
+│   └── DEPLOY-INSTRUCTIONS.md
+│
+└── 📁 Archive
+    └── (ไฟล์เวอร์ชันเก่า)
 ```
 
 ---
 
-## 🛠️ การติดตั้ง
+## 🔧 Configuration
 
-### ขั้นตอนที่ 1: Setup Apps Script Backend
-
-#### 1.1 เตรียม Google Sheet
-
-สร้าง Google Sheet ที่มี 2 tabs:
-
-**Tab 1: `ncd_db_central`** (ข้อมูล NCDs)
-```
-id, ชื่อ, นามสกุล, เพศ, จังหวัด, อำเภอ, ตำบล, ...
-```
-
-**Tab 2: `user`** (ข้อมูล Admin)
-```
-username, password, อำเภอ
-admin001, pass1234, เมือง
-```
-
-📖 ดูรายละเอียด: [GOOGLE-SHEET-STRUCTURE.md](GOOGLE-SHEET-STRUCTURE.md)
-
-#### 1.2 Deploy Apps Script
-
-1. เปิด Google Sheet → Extensions → Apps Script
-2. คัดลอกโค้ดจาก `code.gs` วางใน Editor
-3. แก้ไขค่า config:
-   ```javascript
-   const SHEET_ID = "YOUR_SHEET_ID";
-   const SHEET_NAME = "ncd_db_central";
-   const USER_SHEET_NAME = "user";
-   ```
-4. Deploy → New deployment → Web app
-5. Execute as: **Me**, Who has access: **Anyone**
-6. คัดลอก **Web app URL**
-
----
-
-### ขั้นตอนที่ 2: Deploy GitHub Pages
-
-#### 2.1 Push to GitHub
-
-```bash
-git init
-git add .
-git commit -m "Initial commit: NCDs Dashboard SPA"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
-git push -u origin main
-```
-
-#### 2.2 เปิดใช้งาน GitHub Pages
-
-1. ไปที่ repository → **Settings**
-2. เลือก **Pages** จากเมนูซ้าย
-3. Source: **Deploy from a branch**
-4. Branch: **main**, Folder: **/docs**
-5. คลิก **Save**
-
-รอ 1-2 นาที จะได้ URL:
-```
-https://YOUR_USERNAME.github.io/YOUR_REPO/
-```
-
----
-
-### ขั้นตอนที่ 3: เชื่อมต่อ API
-
-แก้ไขไฟล์ `docs/app.js` บรรทัดที่ 4:
+### Frontend Config (`config.js`)
 
 ```javascript
-const API_URL = 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec';
+const CONFIG = {
+  API_URL: "https://script.google.com/macros/s/YOUR_ID/exec",
+  APP_NAME: "NCDs Dashboard",
+  CACHE: {
+    TTL_SECONDS: 300,  // 5 นาที
+    ENABLED: true
+  },
+  THEME: {
+    DEFAULT: "dark"
+  }
+};
 ```
 
-Push การเปลี่ยนแปลง:
+### Backend Config (`apps-script/code.gs`)
 
-```bash
-git add docs/app.js
-git commit -m "Update API URL"
-git push
+```javascript
+const SHEET_ID = "YOUR_GOOGLE_SHEET_ID";
+const SHEET_NAME = "ncd_db_central";
+const USER_SHEET_NAME = "user";
+const CACHE_TTL_SECONDS = 300;
 ```
 
 ---
 
-## 🎨 การใช้งาน
+## 🌐 Demo & URLs
 
-### Public Dashboard
-
-```
-https://YOUR_USERNAME.github.io/YOUR_REPO/
-```
-
-- ดูสถิติและกราฟ NCDs
-- กรองข้อมูล
-- สลับ Theme
-- ไม่ต้อง Login
-
-### Admin Panel
-
-กดปุ่ม **🔐 Admin Login** หรือเข้า URL:
-
-```
-https://YOUR_APPS_SCRIPT_URL/?page=admin
-```
-
-- Login ด้วย username/password
-- เพิ่ม/แก้ไข/ลบ ข้อมูล
-- Import CSV
-- Export ข้อมูล
-- เห็นเฉพาะข้อมูลอำเภอของตนเอง
+- **Live Dashboard**: https://yu88569.github.io/dashboardNCD/
+- **GitHub Repo**: https://github.com/yu88569/dashboardNCD
+- **Documentation**: [docs/](docs/)
 
 ---
 
-## 🔧 API Endpoints
+## 📊 Database Structure
 
-### GET Requests
-
-```javascript
-// ดึงข้อมูล NCDs
-GET ?action=getData
-
-// Response:
-{
-  "success": true,
-  "data": [...],
-  "updatedAt": "2024-01-01T00:00:00.000Z"
-}
+### Tab: `ncd_db_central`
+```
+id | ชื่อ | นามสกุล | เพศ | จังหวัด | อำเภอ | ตำบล | ...
 ```
 
-### POST Requests
-
-```javascript
-// Login
-POST action=login&username=admin&password=pass
-
-// Logout
-POST action=logout
-
-// Check Session
-POST action=checkSession
+### Tab: `user`
 ```
+username | password | อำเภอ
+admin001 | pass1234 | เมือง
+```
+
+📖 **รายละเอียด**: [docs/GOOGLE-SHEET-STRUCTURE.md](docs/GOOGLE-SHEET-STRUCTURE.md)
+
+---
+
+## 🎨 Technology Stack
+
+### Frontend
+- HTML5, CSS3, Vanilla JavaScript (ES6+)
+- ECharts 5 (Data Visualization)
+- No framework needed
+
+### Backend
+- Google Apps Script (JavaScript)
+- Google Sheets API
+
+### Hosting
+- GitHub Pages (Frontend - Free)
+- Google Cloud (Backend - Free tier)
 
 ---
 
 ## 🔒 Security
 
-- ✅ Session Management (24 ชั่วโมง)
-- ✅ District-based Access Control
+- ✅ Session-based Authentication (24h)
+- ✅ District-level Access Control
 - ✅ Data Masking (ชื่อ-นามสกุล)
-- ✅ HTTPS (GitHub Pages + Apps Script)
-- ⚠️ แนะนำใช้ OAuth สำหรับ production
-
----
-
-## 🎯 เทคโนโลジี
-
-### Frontend
-- HTML5, CSS3, JavaScript (ES6+)
-- ECharts 5 (Data Visualization)
-- No framework (Vanilla JS)
-
-### Backend
-- Google Apps Script
-- Google Sheets (Database)
-
-### Hosting
-- GitHub Pages (Frontend)
-- Google Cloud (Backend)
-
----
-
-## 📊 ตัวอย่าง Screenshots
-
-### Dashboard (Dark Theme)
-```
-[KPI Cards] [Gender Stats] [Charts] [Filters]
-```
-
-### Admin Panel
-```
-[Login] → [Add Record] → [Import CSV] → [Export]
-```
+- ✅ HTTPS Only
+- ✅ Server-side Session Storage
 
 ---
 
 ## 🐛 Troubleshooting
 
-### ปัญหา: ข้อมูลไม่โหลด
+### ปัญหา: Dashboard ไม่โหลดข้อมูล
 
 1. เปิด Developer Console (F12)
-2. ตรวจสอบ API_URL ถูกต้อง
-3. ทดสอบ API:
-   ```
-   https://script.google.com/macros/s/YOUR_ID/exec?action=getData
-   ```
-4. ตรวจสอบ CORS settings
+2. ตรวจสอบ error messages
+3. ตรวจสอบ `config.js` → `API_URL` ถูกต้องหรือไม่
+4. ทดสอบ API โดยตรง: `YOUR_API_URL?action=getData`
 
 ### ปัญหา: Login ไม่ได้
 
-1. ตรวจสอบ username/password ใน Sheet
+1. ตรวจสอบ username/password ใน Google Sheet (tab: `user`)
 2. ตรวจสอบ Apps Script deployment status
-3. ลอง redeploy Apps Script
+3. ลองกด Deploy → New version
 
-📚 ดูเพิ่มเติม: [SETUP-GITHUB-PAGES.md](SETUP-GITHUB-PAGES.md#การแก้ปัญหา)
+### ปัญหา: GitHub Pages แสดง 404
+
+1. ไปที่ Settings → Pages
+2. ตรวจสอบ Source: `Deploy from branch`
+3. Branch: `main`, Folder: `/ (root)`
+4. รอ 1-2 นาที แล้ว refresh
 
 ---
 
-## 📈 Performance
+## 📚 เอกสารเพิ่มเติม
 
-- ⚡ First Load: ~1-2 วินาที
-- 📦 Bundle Size: ~50KB (ไม่รวม ECharts)
-- 🔄 API Response: ~200-500ms
-- 💾 Cache: 5 นาที
+| เอกสาร | รายละเอียด |
+|--------|-----------|
+| [apps-script/README.md](apps-script/README.md) | Backend deployment guide |
+| [docs/SETUP-GITHUB-PAGES.md](docs/SETUP-GITHUB-PAGES.md) | Frontend deployment guide |
+| [docs/GOOGLE-SHEET-STRUCTURE.md](docs/GOOGLE-SHEET-STRUCTURE.md) | Database schema |
+| [docs/QUICKSTART.md](docs/QUICKSTART.md) | เริ่มต้นใน 5 นาที |
 
 ---
 
 ## 🔄 การอัปเดต
 
+### Frontend
 ```bash
-# แก้ไขไฟล์ใน docs/
+# แก้ไขไฟล์ index.html, app.js, styles.css, config.js
 git add .
 git commit -m "Update: description"
 git push
 
-# GitHub Pages จะ auto-deploy ใน 1-2 นาที
+# GitHub Pages จะ deploy อัตโนมัติใน 1-2 นาที
 ```
 
-สำหรับ Apps Script:
-1. แก้ไข `code.gs`
-2. Deploy → Manage deployments → Edit → Version: New version
-3. Deploy
+### Backend
+```
+1. แก้ไข apps-script/code.gs ใน Apps Script Editor
+2. Deploy → Manage deployments → Edit
+3. Version: New version → Deploy
+```
 
 ---
 
 ## 🤝 Contributing
 
 1. Fork repository
-2. สร้าง feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit changes (`git commit -m 'Add AmazingFeature'`)
-4. Push to branch (`git push origin feature/AmazingFeature`)
+2. สร้าง feature branch
+   ```bash
+   git checkout -b feature/AmazingFeature
+   ```
+3. Commit changes
+   ```bash
+   git commit -m "Add AmazingFeature"
+   ```
+4. Push to branch
+   ```bash
+   git push origin feature/AmazingFeature
+   ```
 5. เปิด Pull Request
 
 ---
@@ -351,40 +263,31 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 ---
 
-## 👥 Authors
-
-- **Your Name** - Initial work
-
----
-
 ## 🙏 Acknowledgments
 
 - Google Apps Script Team
 - GitHub Pages
 - ECharts Contributors
-- Thai NCDs Community
+- Thai NCDs Healthcare Community
 
 ---
 
 ## 📞 Support
 
-หากมีปัญหาหรือข้อสงสัย:
-
-1. 📖 อ่าน [QUICKSTART.md](QUICKSTART.md)
-2. 🔍 ตรวจสอบ [Issues](https://github.com/YOUR_USERNAME/YOUR_REPO/issues)
-3. ✉️ สร้าง Issue ใหม่
-4. 💬 ติดต่อผ่าน GitHub Discussions
+- 📖 [Documentation](docs/)
+- 🐛 [Report Issues](https://github.com/yu88569/dashboardNCD/issues)
+- 💬 [Discussions](https://github.com/yu88569/dashboardNCD/discussions)
 
 ---
 
 ## 🗺️ Roadmap
 
 - [ ] OAuth 2.0 Integration
-- [ ] Multi-language Support
-- [ ] Data Export to PDF
-- [ ] Mobile App (PWA)
-- [ ] Real-time Updates
-- [ ] Advanced Analytics
+- [ ] Multi-language Support (EN/TH)
+- [ ] PDF Export
+- [ ] Progressive Web App (PWA)
+- [ ] Real-time Data Sync
+- [ ] Advanced Analytics & Reports
 
 ---
 
