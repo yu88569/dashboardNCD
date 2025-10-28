@@ -27,6 +27,11 @@ const amphoeEl = $("amphoe");
 let adminData = [];
 let currentEditIndex = null;
 
+// Pagination
+let currentPage = 1;
+let itemsPerPage = 20;
+let totalPages = 1;
+
 /* ============================================
    Initialization
    ============================================ */
@@ -144,6 +149,12 @@ function setupEventListeners() {
     window.location.href = "index.html";
   });
 
+  // Pagination
+  $("first-page-btn").addEventListener("click", () => goToPage(1));
+  $("prev-page-btn").addEventListener("click", () => goToPage(currentPage - 1));
+  $("next-page-btn").addEventListener("click", () => goToPage(currentPage + 1));
+  $("last-page-btn").addEventListener("click", () => goToPage(totalPages));
+
   // Record Modal
   $("close-record-modal").addEventListener("click", closeRecordModal);
   $("cancel-btn").addEventListener("click", closeRecordModal);
@@ -178,8 +189,11 @@ async function loadData() {
     if (result.success) {
       adminData = result.data || [];
       console.log("Data array length:", adminData.length);
+      currentPage = 1; // Reset to first page
+      calculatePagination();
       renderTable();
       updateStats();
+      updatePaginationControls();
       dataContainer.style.display = "block";
     } else {
       throw new Error(result.message || "Failed to load data");
@@ -222,6 +236,32 @@ function showLoading(show) {
 }
 
 /* ============================================
+   Pagination
+   ============================================ */
+
+function calculatePagination() {
+  totalPages = Math.ceil(adminData.length / itemsPerPage);
+  if (totalPages === 0) totalPages = 1;
+}
+
+function goToPage(page) {
+  if (page < 1 || page > totalPages) return;
+  currentPage = page;
+  renderTable();
+  updatePaginationControls();
+}
+
+function updatePaginationControls() {
+  $("current-page").textContent = currentPage;
+  $("total-pages").textContent = totalPages;
+
+  $("first-page-btn").disabled = currentPage === 1;
+  $("prev-page-btn").disabled = currentPage === 1;
+  $("next-page-btn").disabled = currentPage === totalPages;
+  $("last-page-btn").disabled = currentPage === totalPages;
+}
+
+/* ============================================
    Table Rendering
    ============================================ */
 
@@ -231,7 +271,7 @@ function renderTable() {
   if (adminData.length === 0) {
     tableBody.innerHTML = `
       <tr>
-        <td colspan="7" style="text-align: center; padding: 40px;">
+        <td colspan="21" style="text-align: center; padding: 40px;">
           <p style="color: var(--text-secondary); font-size: 1.1rem;">
             📭 ไม่มีข้อมูล
           </p>
@@ -241,42 +281,50 @@ function renderTable() {
     return;
   }
 
-  adminData.forEach((record, index) => {
+  // Calculate pagination
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + itemsPerPage, adminData.length);
+  const pageData = adminData.slice(startIndex, endIndex);
+
+  pageData.forEach((record, pageIndex) => {
+    const actualIndex = startIndex + pageIndex;
     const row = document.createElement("tr");
 
-    // Status color
-    let statusColor = "#95a5a6";
+    // Get status badge class
     const ncd = (record["ภาพรวมของการประเมินโรค NCDs"] || "").toLowerCase();
-    if (ncd.includes("เสี่ยง")) statusColor = "#f39c12";
-    if (ncd.includes("ป่วย")) statusColor = "#e74c3c";
-    if (ncd.includes("ปกติ")) statusColor = "#2ecc71";
+    let statusClass = "status-badge";
+    if (ncd.includes("ปกติ")) statusClass += " status-normal";
+    else if (ncd.includes("เสี่ยง")) statusClass += " status-risk";
+    else if (ncd.includes("ป่วย")) statusClass += " status-sick";
 
     row.innerHTML = `
-      <td>${index + 1}</td>
+      <td>${actualIndex + 1}</td>
       <td>${record["ชื่อ"] || "-"}</td>
       <td>${record["นามสกุล"] || "-"}</td>
       <td>${record["เพศ"] || "-"}</td>
+      <td>${record["ชื่อหมู่บ้าน"] || "-"}</td>
+      <td>${record["บ้านเลขที่"] || "-"}</td>
+      <td>${record["จังหวัด"] || "-"}</td>
+      <td>${record["อำเภอ"] || "-"}</td>
       <td>${record["ตำบล"] || "-"}</td>
-      <td>
-        <span style="
-          display: inline-block;
-          padding: 4px 12px;
-          border-radius: 12px;
-          background: ${statusColor}22;
-          color: ${statusColor};
-          font-weight: 500;
-          font-size: 0.85rem;
-        ">
-          ${record["ภาพรวมของการประเมินโรค NCDs"] || "-"}
-        </span>
-      </td>
+      <td>${record["เบอร์โทรศัพท์"] || "-"}</td>
+      <td><span class="${statusClass}">${record["ภาพรวมของการประเมินโรค NCDs"] || "-"}</span></td>
+      <td>${record["โรคอ้วน"] || "-"}</td>
+      <td>${record["โรคเบาหวาน"] || "-"}</td>
+      <td>${record["โรคความดันโลหิต"] || "-"}</td>
+      <td>${record["สุขภาพจิต"] || "-"}</td>
+      <td>${record["สูบบุหรี่"] || "-"}</td>
+      <td>${record["แอลกอฮอล์"] || "-"}</td>
+      <td>${record["สถานะ"] || "-"}</td>
+      <td>${record["ส่งต่อหน่วยบริการ"] || "-"}</td>
+      <td>${record["รหัสหน่วยบริการที่ส่งออก"] || "-"}</td>
       <td>
         <div class="action-buttons">
-          <button class="btn-edit" onclick="openRecordModal(${index})">
-            ✏️ แก้ไข
+          <button class="btn-edit" onclick="openRecordModal(${actualIndex})">
+            ✏️
           </button>
-          <button class="btn-delete" onclick="handleDelete(${index})">
-            🗑️ ลบ
+          <button class="btn-delete" onclick="handleDelete(${actualIndex})">
+            🗑️
           </button>
         </div>
       </td>
@@ -337,7 +385,15 @@ function openRecordModal(index = null) {
     $("tambon").value = record["ตำบล"] || "";
     $("phone").value = record["เบอร์โทรศัพท์"] || "";
     $("ncd").value = record["ภาพรวมของการประเมินโรค NCDs"] || "";
+    $("obesity").value = record["โรคอ้วน"] || "";
+    $("dm").value = record["โรคเบาหวาน"] || "";
+    $("htn").value = record["โรคความดันโลหิต"] || "";
+    $("mental").value = record["สุขภาพจิต"] || "";
+    $("smoke").value = record["สูบบุหรี่"] || "";
+    $("alcohol").value = record["แอลกอฮอล์"] || "";
     $("status").value = record["สถานะ"] || "";
+    $("refer").value = record["ส่งต่อหน่วยบริการ"] || "";
+    $("refer-code").value = record["รหัสหน่วยบริการที่ส่งออก"] || "";
   } else {
     // Add mode
     $("modal-title").textContent = "เพิ่มรายการใหม่";
@@ -372,7 +428,15 @@ async function handleSaveRecord(e) {
     ตำบล: $("tambon").value.trim(),
     เบอร์โทรศัพท์: $("phone").value.trim(),
     "ภาพรวมของการประเมินโรค NCDs": $("ncd").value,
+    โรคอ้วน: $("obesity").value,
+    โรคเบาหวาน: $("dm").value,
+    โรคความดันโลหิต: $("htn").value,
+    สุขภาพจิต: $("mental").value,
+    สูบบุหรี่: $("smoke").value,
+    แอลกอฮอล์: $("alcohol").value,
     สถานะ: $("status").value,
+    ส่งต่อหน่วยบริการ: $("refer").value.trim(),
+    รหัสหน่วยบริการที่ส่งออก: $("refer-code").value.trim(),
   };
 
   try {
