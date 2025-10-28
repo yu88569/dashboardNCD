@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Session & localStorage</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .label {
+            font-weight: 600;
+            color: #555;
+        }
+
+        .value {
+            color: #333;
+            font-family: 'Courier New', monospace;
+            background: #f5f5f5;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .value.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .value.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .value.warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn.danger {
+            background: #dc3545;
+        }
+
+        .btn.danger:hover {
+            background: #c82333;
+        }
+
+        .btn.success {
+            background: #28a745;
+        }
+
+        .btn.success:hover {
+            background: #218838;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 0.9rem;
+            border: 1px solid #ddd;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .status-badge.online {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.offline {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .test-form {
+            display: grid;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 5px;
+        }
+
+        .form-group input {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        #log-container {
+            max-height: 300px;
+            overflow-y: auto;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #666;
+            padding-left: 10px;
+        }
+
+        .log-entry.info {
+            border-left-color: #4a9eff;
+            color: #4a9eff;
+        }
+
+        .log-entry.success {
+            border-left-color: #4ade80;
+            color: #4ade80;
+        }
+
+        .log-entry.error {
+            border-left-color: #f87171;
+            color: #f87171;
+        }
+
+        .log-entry.warning {
+            border-left-color: #fbbf24;
+            color: #fbbf24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug Panel - NCDs Dashboard</h1>
+
+        <!-- Status Card -->
+        <div class="card">
+            <h2>📊 System Status</h2>
+            <div class="info-row">
+                <span class="label">Browser:</span>
+                <span class="value" id="browser-info">-</span>
+            </div>
+            <div class="info-row">
+                <span class="label">localStorage Available:</span>
+                <span class="value" id="storage-status">-</span>
+            </div>
+            <div class="info-row">
+                <span class="label">API URL:</span>
+                <span class="value" id="api-url">-</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Current Time:</span>
+                <span class="value" id="current-time">-</span>
+            </div>
+        </div>
+
+        <!-- Session Info Card -->
+        <div class="card">
+            <h2>🔐 Session Information</h2>
+            <div class="info-row">
+                <span class="label">Session ID:</span>
+                <span class="value" id="session-id">-</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Username:</span>
+                <span class="value" id="username">-</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Amphoe:</span>
+                <span class="value" id="amphoe">-</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Is Logged In:</span>
+                <span class="value" id="is-logged-in">-</span>
+            </div>
+        </div>
+
+        <!-- localStorage Content Card -->
+        <div class="card">
+            <h2>💾 localStorage Content</h2>
+            <pre id="storage-content">Loading...</pre>
+        </div>
+
+        <!-- Test Login Card -->
+        <div class="card">
+            <h2>🧪 Test Login</h2>
+            <div class="test-form">
+                <div class="form-group">
+                    <label for="test-username">Username:</label>
+                    <input type="text" id="test-username" placeholder="admin8" value="admin8">
+                </div>
+                <div class="form-group">
+                    <label for="test-password">Password:</label>
+                    <input type="password" id="test-password" placeholder="Enter password">
+                </div>
+                <div class="btn-group">
+                    <button class="btn success" onclick="testLogin()">🔑 Test Login</button>
+                    <button class="btn" onclick="testCheckSession()">✓ Check Session</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions Card -->
+        <div class="card">
+            <h2>⚙️ Actions</h2>
+            <div class="btn-group">
+                <button class="btn" onclick="refreshData()">🔄 Refresh Data</button>
+                <button class="btn" onclick="viewAllStorage()">👁️ View All Storage</button>
+                <button class="btn danger" onclick="clearSession()">🗑️ Clear Session</button>
+                <button class="btn danger" onclick="clearAllStorage()">💣 Clear All Storage</button>
+                <button class="btn success" onclick="goToAdmin()">➡️ Go to Admin Panel</button>
+            </div>
+        </div>
+
+        <!-- Console Log Card -->
+        <div class="card">
+            <h2>📝 Console Log</h2>
+            <div id="log-container"></div>
+            <div class="btn-group">
+                <button class="btn" onclick="clearLog()">🧹 Clear Log</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="auth.js"></script>
+    <script>
+        // Custom console logging
+        const logContainer = document.getElementById('log-container');
+        const originalLog = console.log;
+        const originalError = console.error;
+        const originalWarn = console.warn;
+
+        function addLog(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addLog(args.join(' '), 'info');
+        };
+
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addLog('ERROR: ' + args.join(' '), 'error');
+        };
+
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            addLog('WARN: ' + args.join(' '), 'warning');
+        };
+
+        function clearLog() {
+            logContainer.innerHTML = '';
+            addLog('Log cleared', 'info');
+        }
+
+        // Initialize
+        function init() {
+            console.log('=== Debug Panel Initialized ===');
+            updateSystemInfo();
+            updateSessionInfo();
+            updateStorageContent();
+            setInterval(() => {
+                document.getElementById('current-time').textContent = new Date().toLocaleString('th-TH');
+            }, 1000);
+        }
+
+        function updateSystemInfo() {
+            console.log('Updating system info...');
+
+            // Browser info
+            const browser = navigator.userAgent;
+            document.getElementById('browser-info').textContent = browser.substring(0, 50) + '...';
+
+            // localStorage status
+            const storageStatus = document.getElementById('storage-status');
+            try {
+                localStorage.setItem('test', 'test');
+                localStorage.removeItem('test');
+                storageStatus.textContent = '✅ Available';
+                storageStatus.className = 'value success';
+                console.log('localStorage is available');
+            } catch (e) {
+                storageStatus.textContent = '❌ Not Available: ' + e.message;
+                storageStatus.className = 'value error';
+                console.error('localStorage is NOT available:', e);
+            }
+
+            // API URL
+            const apiUrl = window.APP_CONFIG?.API_URL || CONFIG?.API_URL || 'Not configured';
+            document.getElementById('api-url').textContent = apiUrl;
+            console.log('API URL:', apiUrl);
+
+            // Current time
+            document.getElementById('current-time').textContent = new Date().toLocaleString('th-TH');
+        }
+
+        function updateSessionInfo() {
+            console.log('Updating session info...');
+
+            if (typeof auth === 'undefined') {
+                console.error('Auth object not found!');
+                return;
+            }
+
+            const sessionId = auth.getSessionId();
+            const userData = auth.getUserData();
+            const isLoggedIn = auth.isLoggedIn();
+
+            document.getElementById('session-id').textContent = sessionId || '(none)';
+            document.getElementById('session-id').className = sessionId ? 'value success' : 'value error';
+
+            document.getElementById('username').textContent = userData?.username || '(none)';
+            document.getElementById('amphoe').textContent = userData?.amphoe || '(none)';
+
+            const isLoggedInEl = document.getElementById('is-logged-in');
+            isLoggedInEl.textContent = isLoggedIn ? '✅ Yes' : '❌ No';
+            isLoggedInEl.className = isLoggedIn ? 'value success' : 'value error';
+
+            console.log('Session ID:', sessionId);
+            console.log('User Data:', userData);
+            console.log('Is Logged In:', isLoggedIn);
+        }
+
+        function updateStorageContent() {
+            console.log('Updating storage content...');
+            const content = {};
+
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const value = localStorage.getItem(key);
+                content[key] = value;
+            }
+
+            document.getElementById('storage-content').textContent = JSON.stringify(content, null, 2);
+            console.log('localStorage content:', content);
+        }
+
+        async function testLogin() {
+            const username = document.getElementById('test-username').value.trim();
+            const password = document.getElementById('test-password').value;
+
+            if (!username || !password) {
+                alert('❌ Please enter username and password');
+                return;
+            }
+
+            console.log('=== Testing Login ===');
+            console.log('Username:', username);
+
+            try {
+                const result = await auth.login(username, password);
+                console.log('Login result:', result);
+
+                if (result.success) {
+                    console.log('✅ Login successful!');
+                    addLog('Login successful!', 'success');
+                    alert('✅ Login สำเร็จ!');
+                    refreshData();
+                } else {
+                    console.error('❌ Login failed:', result.message);
+                    addLog('Login failed: ' + result.message, 'error');
+                    alert('❌ Login ไม่สำเร็จ: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                addLog('Login error: ' + error.message, 'error');
+                alert('❌ เกิดข้อผิดพลาด: ' + error.message);
+            }
+        }
+
+        async function testCheckSession() {
+            console.log('=== Checking Session ===');
+
+            try {
+                const result = await auth.checkSession();
+                console.log('Session check result:', result);
+
+                if (result.valid) {
+                    console.log('✅ Session is valid');
+                    addLog('Session is valid', 'success');
+                    alert('✅ Session ยังใช้งานได้');
+                } else {
+                    console.warn('⚠️ Session is invalid:', result.message);
+                    addLog('Session is invalid: ' + result.message, 'warning');
+                    alert('⚠️ Session หมดอายุ: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Session check error:', error);
+                addLog('Session check error: ' + error.message, 'error');
+                alert('❌ เกิดข้อผิดพลาด: ' + error.message);
+            }
+        }
+
+        function refreshData() {
+            console.log('Refreshing all data...');
+            updateSystemInfo();
+            updateSessionInfo();
+            updateStorageContent();
+            addLog('Data refreshed', 'success');
+        }
+
+        function viewAllStorage() {
+            console.log('=== All localStorage Items ===');
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const value = localStorage.getItem(key);
+                console.log(`${key}:`, value);
+            }
+            alert('✓ Check console for all storage items');
+        }
+
+        function clearSession() {
+            if (!confirm('ต้องการลบ Session หรือไม่?')) return;
+
+            console.log('Clearing session...');
+            auth.clearSession();
+            console.log('Session cleared');
+            addLog('Session cleared', 'warning');
+            refreshData();
+            alert('✅ ลบ Session แล้ว');
+        }
+
+        function clearAllStorage() {
+            if (!confirm('⚠️ ต้องการลบข้อมูลทั้งหมดใน localStorage หรือไม่?')) return;
+
+            console.log('Clearing all storage...');
+            localStorage.clear();
+            console.log('All storage cleared');
+            addLog('All storage cleared', 'warning');
+            refreshData();
+            alert('✅ ลบข้อมูลทั้งหมดแล้ว');
+        }
+
+        function goToAdmin() {
+            if (!auth.isLoggedIn()) {
+                alert('❌ กรุณา Login ก่อน');
+                return;
+            }
+            console.log('Navigating to admin panel...');
+            window.location.href = 'admin.html';
+        }
+
+        // Initialize on load
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

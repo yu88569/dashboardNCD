@@ -529,38 +529,55 @@ function initModals() {
   if (loginForm) {
     loginForm.onsubmit = async (e) => {
       e.preventDefault();
-      const username = $("username").value;
+      const username = $("username").value.trim();
       const password = $("password").value;
 
-      try {
-        const response = await fetch(API_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: new URLSearchParams({
-            action: "login",
-            username: username,
-            password: password,
-          }),
-        });
+      // Disable form during login
+      const submitBtn = loginForm.querySelector('button[type="submit"]');
+      const originalBtnText = submitBtn.textContent;
+      submitBtn.disabled = true;
+      submitBtn.textContent = "กำลังเข้าสู่ระบบ...";
 
-        const result = await response.json();
+      try {
+        console.log("Attempting login for user:", username);
+
+        // Use auth.login() to properly save session
+        const result = await auth.login(username, password);
+
+        console.log("Login result:", result);
 
         if (result.success) {
-          alert("✅ เข้าสู่ระบบสำเร็จ!");
+          alert("✅ เข้าสู่ระบบสำเร็จ!\n\nกำลังเปิดหน้า Admin Panel...");
           loginModal.style.display = "none";
-          // Redirect to admin page or update UI
-          window.location.href = result.redirectUrl || "admin.html";
+
+          // Small delay to ensure session is saved
+          setTimeout(() => {
+            window.location.href = "admin.html";
+          }, 100);
         } else {
           alert(
-            "❌ เข้าสู่ระบบไม่สำเร็จ: " +
-              (result.error || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"),
+            "❌ เข้าสู่ระบบไม่สำเร็จ\n\n" +
+              (result.message || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"),
           );
+          // Re-enable form
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalBtnText;
         }
       } catch (err) {
         console.error("Login error:", err);
-        alert("❌ เกิดข้อผิดพลาด: " + err.message);
+        alert(
+          "❌ เกิดข้อผิดพลาดในการเชื่อมต่อ\n\n" +
+            "รายละเอียด: " +
+            err.message +
+            "\n\n" +
+            "กรุณาตรวจสอบ:\n" +
+            "1. การเชื่อมต่ออินเทอร์เน็ต\n" +
+            "2. URL ของ Google Apps Script\n" +
+            "3. การตั้งค่า CORS ใน Apps Script",
+        );
+        // Re-enable form
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalBtnText;
       }
     };
   }

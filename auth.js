@@ -19,7 +19,9 @@ class AuthManager {
    */
   getSessionId() {
     try {
-      return localStorage.getItem(this.sessionKey);
+      const sessionId = localStorage.getItem(this.sessionKey);
+      console.log("Getting session ID:", sessionId ? "Found" : "Not found");
+      return sessionId;
     } catch (e) {
       console.error("Failed to get session ID:", e);
       return null;
@@ -31,7 +33,9 @@ class AuthManager {
    */
   setSessionId(sessionId) {
     try {
+      console.log("Setting session ID:", sessionId);
       localStorage.setItem(this.sessionKey, sessionId);
+      console.log("Session ID saved successfully");
       return true;
     } catch (e) {
       console.error("Failed to set session ID:", e);
@@ -45,7 +49,9 @@ class AuthManager {
   getUserData() {
     try {
       const data = localStorage.getItem(this.userKey);
-      return data ? JSON.parse(data) : null;
+      const parsed = data ? JSON.parse(data) : null;
+      console.log("Getting user data:", parsed);
+      return parsed;
     } catch (e) {
       console.error("Failed to get user data:", e);
       return null;
@@ -57,7 +63,9 @@ class AuthManager {
    */
   setUserData(userData) {
     try {
+      console.log("Setting user data:", userData);
       localStorage.setItem(this.userKey, JSON.stringify(userData));
+      console.log("User data saved successfully");
       return true;
     } catch (e) {
       console.error("Failed to set user data:", e);
@@ -83,7 +91,9 @@ class AuthManager {
    * Check if user is logged in
    */
   isLoggedIn() {
-    return !!this.getSessionId();
+    const loggedIn = !!this.getSessionId();
+    console.log("Is logged in:", loggedIn);
+    return loggedIn;
   }
 
   /* ============================================
@@ -109,14 +119,21 @@ class AuthManager {
       });
 
       const result = await response.json();
+      console.log("Login API response:", result);
 
       if (result.success) {
         // Save session
+        console.log("Login successful, saving session...");
         this.setSessionId(result.sessionId);
         this.setUserData({
           username: result.user.username,
           amphoe: result.user.amphoe,
         });
+        console.log("Session saved. Verifying...");
+        console.log("Stored session ID:", this.getSessionId());
+        console.log("Stored user data:", this.getUserData());
+      } else {
+        console.warn("Login failed:", result.message);
       }
 
       return result;

@@ -32,29 +32,59 @@ let currentEditIndex = null;
    ============================================ */
 
 document.addEventListener("DOMContentLoaded", async () => {
-  console.log("Admin panel loaded");
+  console.log("=== Admin panel loading ===");
+  console.log("Current URL:", window.location.href);
+  console.log("localStorage keys:", Object.keys(localStorage));
+  console.log("Auth object:", auth);
 
   // Check authentication
+  console.log("Checking if user is logged in...");
   if (!auth.isLoggedIn()) {
+    console.error("User is not logged in - no session found");
     alert("❌ กรุณา Login ก่อนเข้าใช้งาน");
     window.location.href = "index.html";
     return;
   }
+  console.log("User is logged in, session found");
 
-  // Verify session
-  const sessionCheck = await auth.checkSession();
-  if (!sessionCheck.valid) {
-    alert("❌ Session หมดอายุ\nกรุณา Login ใหม่");
-    auth.clearSession();
-    window.location.href = "index.html";
-    return;
-  }
-
-  // Initialize
+  // Initialize first (so user sees the interface)
   initTheme();
   loadUserInfo();
   setupEventListeners();
-  await loadData();
+
+  // Verify session (with better error handling)
+  try {
+    console.log("Verifying session with API...");
+    const sessionCheck = await auth.checkSession();
+    console.log("Session check result:", sessionCheck);
+
+    if (!sessionCheck.valid) {
+      console.warn("Session check failed:", sessionCheck.message);
+      alert("❌ Session หมดอายุ\nกรุณา Login ใหม่");
+      auth.clearSession();
+      window.location.href = "index.html";
+      return;
+    }
+
+    console.log("Session is valid, loading data...");
+    // Load data only after session is verified
+    await loadData();
+    console.log("=== Admin panel loaded successfully ===");
+  } catch (error) {
+    console.error("Session verification error:", error);
+    // If API is unreachable, allow user to continue (they're already logged in)
+    console.warn("Unable to verify session with server, proceeding anyway...");
+
+    // Try to load data anyway
+    try {
+      console.log("Attempting to load data despite session check failure...");
+      await loadData();
+      console.log("Data loaded successfully despite session check failure");
+    } catch (dataError) {
+      console.error("Failed to load data:", dataError);
+      alert("❌ ไม่สามารถโหลดข้อมูลได้\nกรุณาตรวจสอบการเชื่อมต่อ API");
+    }
+  }
 });
 
 /* ============================================
