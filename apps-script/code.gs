@@ -508,13 +508,13 @@ function getAdminDataObj(sessionId) {
     const session = getSessionById_(sessionId);
     if (!session) {
       Logger.log("No session found");
-      return { data: [], updatedAt: new Date(), error: "ไม่ได้ล็อกอิน" };
+      return { success: false, message: "ไม่ได้ล็อกอิน", data: [] };
     }
 
     const amphoe = session.amphoe;
     if (!amphoe) {
       Logger.log("No amphoe in session");
-      return { data: [], updatedAt: new Date(), error: "ไม่ได้กำหนดอำเภอ" };
+      return { success: false, message: "ไม่ได้กำหนดอำเภอ", data: [] };
     }
 
     Logger.log("Loading data for amphoe: " + amphoe);
@@ -550,7 +550,12 @@ function getAdminDataObj(sessionId) {
 
     const result = JSON.parse(json);
     Logger.log("Returning data with " + result.data.length + " rows");
-    return result;
+    return {
+      success: true,
+      data: result.data,
+      updatedAt: result.updatedAt,
+      amphoe: result.amphoe
+    };
   } catch (error) {
     Logger.log("Error in getAdminDataObj: " + error.toString());
     return { success: false, message: error.toString(), data: [], updatedAt: new Date() };

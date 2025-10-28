@@ -221,15 +221,20 @@ class AuthManager {
    */
   async getAdminData() {
     const sessionId = this.getSessionId();
+    console.log("getAdminData: sessionId =", sessionId);
 
     if (!sessionId) {
       throw new Error("No session found. Please login.");
     }
 
     try {
+      console.log("getAdminData: Preparing request to API...");
       const formData = new URLSearchParams();
       formData.append("action", "getAdminData");
       formData.append("sessionId", sessionId);
+
+      console.log("getAdminData: Sending request to", this.apiUrl);
+      console.log("getAdminData: Request body:", formData.toString());
 
       const response = await fetch(this.apiUrl, {
         method: "POST",
@@ -239,15 +244,72 @@ class AuthManager {
         body: formData,
       });
 
-      const result = await response.json();
+      console.log("getAdminData: Response status:", response.status);
+      console.log("getAdminData: Response headers:", response.headers);
 
-      if (!result.success) {
+      // Get response text first to handle parse errors
+      const responseText = await response.text();
+      console.log(
+        "getAdminData: Raw response:",
+        responseText.substring(0, 500),
+      );
+
+      let result;
+      try {
+        result = JSON.parse(responseText);
+        console.log("getAdminData: Parsed result:", result);
+      } catch (parseError) {
+        console.error("getAdminData: JSON parse error:", parseError);
+        console.error("getAdminData: Response text:", responseText);
+        throw new Error("Invalid JSON response from server");
+      }
+
+      // Backward compatibility: handle old response format
+      // Old format: { data: [...], updatedAt: ..., amphoe: "...", error: "..." }
+      // New format: { success: true/false, data: [...], message: "..." }
+
+      if (result.error) {
+        // Old error format
+        console.error(
+          "getAdminData: API returned error (old format):",
+          result.error,
+        );
+        throw new Error(result.error);
+      }
+
+      if (result.success === false) {
+        // New error format
+        console.error("getAdminData: API returned error:", result.message);
         throw new Error(result.message || "Failed to fetch admin data");
       }
 
+      // If success field is not present but data exists, assume success (old format)
+      if (result.success === undefined && result.data) {
+        console.log(
+          "getAdminData: Using old response format, converting to new format",
+        );
+        result = {
+          success: true,
+          data: result.data,
+          updatedAt: result.updatedAt,
+          amphoe: result.amphoe,
+        };
+      }
+
+      // Final check
+      if (!result.success) {
+        console.error("getAdminData: Response indicates failure");
+        throw new Error(result.message || "Failed to fetch admin data");
+      }
+
+      console.log(
+        "getAdminData: Success! Data length:",
+        result.data?.length || 0,
+      );
       return result;
     } catch (error) {
       console.error("Get admin data error:", error);
+      console.error("Error stack:", error.stack);
       throw error;
     }
   }

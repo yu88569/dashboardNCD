@@ -171,10 +171,13 @@ async function loadData() {
     showLoading(true);
     dataContainer.style.display = "none";
 
+    console.log("Loading admin data...");
     const result = await auth.getAdminData();
+    console.log("Admin data loaded:", result);
 
     if (result.success) {
       adminData = result.data || [];
+      console.log("Data array length:", adminData.length);
       renderTable();
       updateStats();
       dataContainer.style.display = "block";
@@ -183,12 +186,27 @@ async function loadData() {
     }
   } catch (error) {
     console.error("Load data error:", error);
-    alert("❌ เกิดข้อผิดพลาดในการโหลดข้อมูล\n" + error.message);
+
+    // Show more detailed error message
+    let errorMsg = "❌ เกิดข้อผิดพลาดในการโหลดข้อมูล\n\n";
+    errorMsg += "รายละเอียด: " + error.message + "\n\n";
 
     // Check if session expired
-    if (error.message.includes("session") || error.message.includes("login")) {
+    if (
+      error.message.includes("session") ||
+      error.message.includes("login") ||
+      error.message.includes("ไม่ได้ล็อกอิน")
+    ) {
+      errorMsg += "กรุณา Login ใหม่";
+      alert(errorMsg);
       auth.clearSession();
       window.location.href = "index.html";
+    } else {
+      errorMsg += "กรุณาตรวจสอบ:\n";
+      errorMsg += "1. การเชื่อมต่ออินเทอร์เน็ต\n";
+      errorMsg += "2. การตั้งค่า Google Apps Script\n";
+      errorMsg += "3. สิทธิ์การเข้าถึง Google Sheets";
+      alert(errorMsg);
     }
   } finally {
     showLoading(false);
