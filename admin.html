@@ -334,8 +334,12 @@
       .loading {
         display: none;
         text-align: center;
-        padding: 40px;
-        color: var(--text-secondary);
+        padding: 60px 40px;
+        color: var(--text-primary);
+        background: var(--card-bg);
+        border-radius: 12px;
+        box-shadow: var(--card-shadow);
+        margin: 20px 0;
       }
 
       .loading.active {
@@ -343,13 +347,20 @@
       }
 
       .spinner {
-        border: 4px solid var(--border-color);
-        border-top: 4px solid var(--primary-color);
+        border: 5px solid var(--border-color);
+        border-top: 5px solid var(--primary-color);
         border-radius: 50%;
-        width: 40px;
-        height: 40px;
+        width: 60px;
+        height: 60px;
         animation: spin 1s linear infinite;
         margin: 0 auto 20px;
+      }
+
+      .loading p {
+        font-size: 1.1rem;
+        font-weight: 500;
+        color: var(--text-primary);
+        margin: 15px 0 0 0;
       }
 
       .stats-summary {
@@ -641,7 +652,7 @@
       <!-- Loading -->
       <div id="loading" class="loading">
         <div class="spinner"></div>
-        <p>กำลังโหลดข้อมูล...</p>
+        <p style="margin-top: 15px; font-size: 1rem; font-weight: 500;">กำลังโหลดข้อมูล...</p>
       </div>
 
       <!-- Data Table -->

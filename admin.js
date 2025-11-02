@@ -565,21 +565,78 @@ async function handleImportCSV() {
    ============================================ */
 
 async function handleExport() {
-  if (!confirm("❓ ต้องการส่งออกข้อมูลเป็น Google Sheets หรือไม่?")) {
+  if (adminData.length === 0) {
+    alert("❌ ไม่มีข้อมูลให้ส่งออก");
+    return;
+  }
+
+  if (!confirm("❓ ต้องการส่งออกข้อมูลเป็นไฟล์ CSV หรือไม่?")) {
     return;
   }
 
   try {
     showLoading(true);
 
-    const result = await auth.exportToSheets();
+    // Define CSV headers
+    const headers = [
+      "ชื่อ",
+      "นามสกุล",
+      "เพศ",
+      "ชื่อหมู่บ้าน",
+      "บ้านเลขที่",
+      "จังหวัด",
+      "อำเภอ",
+      "ตำบล",
+      "เบอร์โทรศัพท์",
+      "ภาพรวมของการประเมินโรค NCDs",
+      "โรคอ้วน",
+      "โรคเบาหวาน",
+      "โรคความดันโลหิต",
+      "สุขภาพจิต",
+      "สูบบุหรี่",
+      "แอลกอฮอล์",
+      "สถานะ",
+      "ส่งต่อหน่วยบริการ",
+      "รหัสหน่วยบริการที่ส่งออก",
+    ];
 
-    if (result.success && result.url) {
-      alert("✅ ส่งออกข้อมูลสำเร็จ!\n\nกำลังเปิด Google Sheets...");
-      window.open(result.url, "_blank");
-    } else {
-      throw new Error(result.message || "Failed to export data");
-    }
+    // Create CSV content
+    let csvContent = "\uFEFF"; // UTF-8 BOM for Excel
+    csvContent += headers.join(",") + "\n";
+
+    // Add data rows
+    adminData.forEach((record) => {
+      const row = headers.map((header) => {
+        let value = record[header] || "";
+        // Escape quotes and wrap in quotes if contains comma or quote
+        value = value.toString().replace(/"/g, '""');
+        if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+          value = `"${value}"`;
+        }
+        return value;
+      });
+      csvContent += row.join(",") + "\n";
+    });
+
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+
+    // Generate filename with current date
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, "");
+    const timeStr = now.toTimeString().slice(0, 5).replace(/:/g, "");
+    const filename = `NCDs_Dashboard_Export_${dateStr}_${timeStr}.csv`;
+
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    alert(`✅ ส่งออกข้อมูลสำเร็จ!\n\nไฟล์: ${filename}\nจำนวน: ${adminData.length} รายการ`);
   } catch (error) {
     console.error("Export error:", error);
     alert("❌ เกิดข้อผิดพลาดในการส่งออก\n" + error.message);
